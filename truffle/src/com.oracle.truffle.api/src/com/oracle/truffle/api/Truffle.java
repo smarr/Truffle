@@ -151,6 +151,7 @@ public final class Truffle {
         String reason;
         if (ModuleLayer.boot().findModule("jdk.internal.vm.ci").isPresent()) {
             reason = "No optimizing Truffle runtime found on the module or class-path.";
+            throw new InternalError(reason);
         } else {
             reason = "JVMCI is required to enable optimizations. Pass -XX:+EnableJVMCI as a virtual machine argument to the java executable to resolve this.";
         }
