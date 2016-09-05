@@ -166,6 +166,15 @@ public class Breakpoint {
         static final Kind[] VALUES = values();
     }
 
+    /**
+     * A simple way to have conditional breakpoints, without language-level expressions.
+     *
+     * This is meant to implement complex breakpoints for the debugger.
+     */
+    public interface SimpleCondition {
+        boolean evaluate();
+    }
+
     private static final Breakpoint BUILDER_INSTANCE = new Breakpoint();
 
     private final SuspendAnchor suspendAnchor;
@@ -183,9 +192,12 @@ public class Breakpoint {
     private volatile boolean resolved;
     private volatile int ignoreCount;
     private volatile boolean disposed;
+
     private volatile String condition;
     private volatile boolean global;
     private volatile GlobalBreakpoint roWrapper;
+
+    private volatile SimpleCondition simpleCondition;
 
     /* We use long instead of int in the implementation to avoid not hitting again on overflows. */
     private final AtomicLong hitCount = new AtomicLong();
@@ -325,8 +337,18 @@ public class Breakpoint {
      * @since 0.9
      */
     public synchronized void setCondition(String expression) {
-        boolean existsChanged = (this.condition == null) != (expression == null);
+        boolean existsChanged = conditionIsNotSet() != (expression == null);
+
         this.condition = expression;
+        this.simpleCondition = null;
+        invalidateConditionUnchangedAssumption(existsChanged);
+    }
+
+    private boolean conditionIsNotSet() {
+        return this.condition == null && this.simpleCondition == null;
+    }
+
+    private void invalidateConditionUnchangedAssumption(boolean existsChanged) {
         Assumption assumption = conditionUnchanged;
         if (assumption != null) {
             this.conditionUnchanged = null;
@@ -339,6 +361,13 @@ public class Breakpoint {
                 assumption.invalidate();
             }
         }
+    }
+
+    public synchronized void setCondition(SimpleCondition condition) {
+        boolean existsChanged = conditionIsNotSet() != (condition == null);
+        this.simpleCondition = condition;
+        this.condition = null;
+        invalidateConditionUnchangedAssumption(existsChanged);
     }
 
     /**
@@ -773,8 +802,7 @@ public class Breakpoint {
                             // breakpoint's node otherwise.
                             try {
                                 wait();
-                            } catch (InterruptedException e) {
-                            }
+                            } catch (InterruptedException e) {}
                         }
                     }
                     DebugException de;
@@ -1289,7 +1317,7 @@ public class Breakpoint {
         protected final BranchProfile breakBranch = BranchProfile.create();
 
         @Child private NodeLibrary contextNodeLibrary;
-        @Child private ConditionalBreakNode breakCondition;
+        @Child private AbstractConditionalBreakNode breakCondition;
         @CompilationFinal private Assumption conditionExistsUnchanged;
         @CompilationFinal protected boolean activeOnNoninternalCalls;
         @CompilationFinal private SessionList sessionList;
@@ -1303,7 +1331,12 @@ public class Breakpoint {
             }
             this.conditionExistsUnchanged = breakpoint.getConditionExistsUnchanged();
             if (breakpoint.condition != null) {
+                assert breakpoint.simpleCondition == null : "We don't support both conditions being set at the same time.";
                 this.breakCondition = new ConditionalBreakNode(context, breakpoint);
+            }
+            if (breakpoint.simpleCondition != null) {
+                assert breakpoint.condition == null : "We don't support both conditions being set at the same time.";
+                this.breakCondition = new SimpleConditionalBreakNode(context, breakpoint);
             }
         }
 
@@ -1429,7 +1462,7 @@ public class Breakpoint {
         }
 
         boolean testCondition(VirtualFrame frame) throws BreakpointConditionFailure {
-            ConditionalBreakNode conditionNode = breakCondition;
+            AbstractConditionalBreakNode conditionNode = breakCondition;
             if (!conditionExistsUnchanged.isValid()) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 if (breakpoint.condition != null) {
@@ -1447,7 +1480,7 @@ public class Breakpoint {
             }
             if (conditionNode != null) {
                 try {
-                    return conditionNode.executeBreakCondition(frame, localSessions);
+                    return conditionNode.shouldBreak(frame, localSessions);
                 } catch (Throwable e) {
                     CompilerDirectives.transferToInterpreter();
                     throw new BreakpointConditionFailure(breakpoint, e);
@@ -1505,26 +1538,58 @@ public class Breakpoint {
 
     }
 
-    private static class ConditionalBreakNode extends Node {
+    private abstract static class AbstractConditionalBreakNode extends Node {
 
-        private static final Object[] EMPTY_ARRAY = new Object[0];
+        protected final EventContext context;
+        protected final Breakpoint breakpoint;
 
-        private final EventContext context;
-        private final Breakpoint breakpoint;
-        @Child private SetThreadSuspensionEnabledNode suspensionEnabledNode = SetThreadSuspensionEnabledNodeGen.create();
-        @Child private DirectCallNode conditionCallNode;
-        @Child private ExecutableNode conditionSnippet;
-        @CompilationFinal private Assumption conditionUnchanged;
-        @Child private InteropLibrary interopLibrary;
+        @Child protected SetThreadSuspensionEnabledNode suspensionEnabledNode = SetThreadSuspensionEnabledNodeGen.create();
 
-        ConditionalBreakNode(EventContext context, Breakpoint breakpoint) {
+        @CompilationFinal protected Assumption conditionUnchanged;
+        @Child protected InteropLibrary interopLibrary;
+
+        AbstractConditionalBreakNode(EventContext context, Breakpoint breakpoint) {
             this.context = context;
             this.breakpoint = breakpoint;
             this.conditionUnchanged = breakpoint.getConditionUnchanged();
             this.interopLibrary = InteropLibrary.getFactory().createDispatched(5);
         }
 
-        boolean executeBreakCondition(VirtualFrame frame, SessionList sessions) {
+        abstract boolean shouldBreak(VirtualFrame frame, SessionList sessions);
+    }
+
+    private static class SimpleConditionalBreakNode extends AbstractConditionalBreakNode {
+        @CompilationFinal private SimpleCondition condition;
+
+        SimpleConditionalBreakNode(EventContext context, Breakpoint breakpoint) {
+            super(context, breakpoint);
+            this.condition = breakpoint.simpleCondition;
+        }
+
+        @Override
+        boolean shouldBreak(VirtualFrame frame, SessionList sessions) {
+            if (!conditionUnchanged.isValid()) {
+                CompilerDirectives.transferToInterpreterAndInvalidate();
+                condition = breakpoint.simpleCondition;
+            }
+
+            return condition.evaluate();
+        }
+    }
+
+    private static class ConditionalBreakNode extends AbstractConditionalBreakNode {
+
+        private static final Object[] EMPTY_ARRAY = new Object[0];
+
+        @Child private DirectCallNode conditionCallNode;
+        @Child private ExecutableNode conditionSnippet;
+
+        ConditionalBreakNode(EventContext context, Breakpoint breakpoint) {
+            super(context, breakpoint);
+        }
+
+        @Override
+        boolean shouldBreak(VirtualFrame frame, SessionList sessions) {
             if ((conditionSnippet == null && conditionCallNode == null) || !conditionUnchanged.isValid()) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 initializeConditional(frame.materialize());
@@ -1709,8 +1774,7 @@ class BreakpointSnippets {
     @SuppressFBWarnings("")
     public void example() {
         SuspendedCallback suspendedCallback = new SuspendedCallback() {
-            public void onSuspend(SuspendedEvent event) {
-            }
+            public void onSuspend(SuspendedEvent event) {}
         };
         Source someCode = Source.newBuilder("", "", "").build();
         TruffleInstrument.Env instrumentEnvironment = null;
