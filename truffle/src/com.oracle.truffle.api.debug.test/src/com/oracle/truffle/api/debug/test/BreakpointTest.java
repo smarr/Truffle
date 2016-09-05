@@ -201,7 +201,7 @@ public class BreakpointTest extends AbstractDebugTest {
             expectDone();
             assertEquals(2, breakpoint.getHitCount());
 
-            breakpoint.setCondition(null); // remove the condition
+            breakpoint.setCondition((String) null); // remove the condition
             startEval(testSource);
             expectSuspended((SuspendedEvent event) -> {
                 assertSame(breakpoint, event.getBreakpoints().iterator().next());
@@ -350,8 +350,8 @@ public class BreakpointTest extends AbstractDebugTest {
                     assertEquals(1, event.getBreakpoints().size());
                     Breakpoint hit = event.getBreakpoints().get(0);
                     assertSame(breakpoint1, hit);
-                    breakpoint1.setCondition(null);
-                    breakpoint2.setCondition(null);
+                    breakpoint1.setCondition((String) null);
+                    breakpoint2.setCondition((String) null);
                     assertEquals(out3, getOutput());
                 });
                 expectSuspended((SuspendedEvent event) -> {
@@ -825,7 +825,7 @@ public class BreakpointTest extends AbstractDebugTest {
             // O.K.
         }
         try {
-            newBP.setCondition(null);
+            newBP.setCondition((String) null);
             Assert.fail();
         } catch (IllegalStateException ex) {
             // O.K.
