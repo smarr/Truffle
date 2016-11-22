@@ -51,6 +51,7 @@ import com.oracle.truffle.api.debug.DebugValue.HeapValue;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.FrameInstance.FrameAccess;
+import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.nodes.LanguageInfo;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
@@ -237,7 +238,7 @@ public final class DebugStackFrame {
     /**
      * Returns the current node for this stack frame, or <code>null</code> if the requesting
      * language class does not match the root node guest language.
-     * 
+     *
      * This method is permitted only if the guest language class is available. This is the case if
      * you want to utilize the Debugger API directly from within a guest language, or if you are an
      * instrument bound/dependent on a specific language.
@@ -404,4 +405,14 @@ public final class DebugStackFrame {
         event.verifyValidState(allowDifferentThread);
     }
 
+    /**
+     * @since smarr/debugger
+     */
+    public Frame getFrame() {
+        return findTruffleFrame(FrameAccess.READ_ONLY);
+    }
+
+    public RootNode getRootNode() {
+        return findCurrentRoot();
+    }
 }
