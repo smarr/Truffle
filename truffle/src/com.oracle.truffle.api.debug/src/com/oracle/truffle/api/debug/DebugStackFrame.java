@@ -513,4 +513,14 @@ public final class DebugStackFrame {
         event.verifyValidState(allowDifferentThread);
     }
 
+    /**
+     * @since smarr/debugger
+     */
+    public Frame getFrame() {
+        return findTruffleFrame(FrameAccess.READ_ONLY);
+    }
+
+    public RootNode getRootNode() {
+        return findCurrentRoot();
+    }
 }
