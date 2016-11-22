@@ -327,7 +327,7 @@ public final class DebugStackFrame {
     /**
      * Returns the current node for this stack frame, or <code>null</code> if the requesting
      * language class does not match the root node guest language.
-     * 
+     *
      * This method is permitted only if the guest language class is available. This is the case if
      * you want to utilize the Debugger API directly from within a guest language, or if you are an
      * instrument bound/dependent on a specific language.
@@ -509,4 +509,14 @@ public final class DebugStackFrame {
         event.verifyValidState(allowDifferentThread);
     }
 
+    /**
+     * @since smarr/debugger
+     */
+    public Frame getFrame() {
+        return findTruffleFrame(FrameAccess.READ_ONLY);
+    }
+
+    public RootNode getRootNode() {
+        return findCurrentRoot();
+    }
 }
