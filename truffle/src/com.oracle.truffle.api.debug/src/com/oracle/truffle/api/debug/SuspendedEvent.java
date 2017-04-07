@@ -242,6 +242,20 @@ public final class SuspendedEvent {
     }
 
     /**
+     * @since smarr/debugger
+     */
+    public SteppingLocation getLocation() {
+        return location;
+    }
+
+    /**
+     * SM: Reintroduce getNode(). Removed from Truffle 0.25
+     */
+    public Node getNode() {
+        return context.getInstrumentedNode();
+    }
+
+    /**
      * Returns the guest language source section of the AST node before/after the execution is
      * suspended. Returns <code>null</code> if no source section information is available.
      * <p>
