@@ -75,7 +75,7 @@ final class SuspendableLocationFinder {
     private SuspendableLocationFinder() {
     }
 
-    static SourceSection findNearest(Source source, SourceElement[] sourceElements, int line, int column, SuspendAnchor anchor, TruffleInstrument.Env env) {
+    static SourceSection findNearest(Source source, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag, SuspendAnchor anchor, TruffleInstrument.Env env) {
         if (!source.hasCharacters()) {
             return null;
         }
@@ -89,16 +89,19 @@ final class SuspendableLocationFinder {
         if (boundColumn > maxColumn) {
             boundColumn = maxColumn;
         }
-        return findNearestBound(source, getElementTags(sourceElements), boundLine, boundColumn, anchor, env);
+        return findNearestBound(source, getElementTags(sourceElements, tag), boundLine, boundColumn, anchor, env);
     }
 
-    private static Set<Class<? extends Tag>> getElementTags(SourceElement[] sourceElements) {
-        if (sourceElements.length == 1) {
+    private static Set<Class<? extends Tag>> getElementTags(SourceElement[] sourceElements, Class<? extends Tag> tag) {
+        if (sourceElements.length == 1 && tag == null) {
             return Collections.singleton(sourceElements[0].getTag());
         }
         Set<Class<? extends Tag>> elementTags = new HashSet<>();
         for (int i = 0; i < sourceElements.length; i++) {
             elementTags.add(sourceElements[i].getTag());
+        }
+        if (tag != null) {
+            elementTags.add(tag);
         }
         return elementTags;
     }
