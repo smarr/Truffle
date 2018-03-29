@@ -45,6 +45,7 @@ import java.util.function.Predicate;
 
 import com.oracle.truffle.api.instrumentation.SourceFilter;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter.IndexRange;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument;
 import com.oracle.truffle.api.source.Source;
@@ -74,13 +75,13 @@ abstract class BreakpointLocation {
     static final BreakpointLocation ANY = new BreakpointSourceLocation();
 
     static final URI ANY_SOURCE = URI.create("");
-
-    static BreakpointLocation create(Object key, SourceElement[] sourceElements, SourceSection sourceSection) {
-        return new BreakpointSourceLocation(key, sourceElements, sourceSection);
+    
+    static BreakpointLocation create(Object key, SourceElement[] sourceElements, SourceSection sourceSection, Class<? extends Tag> tag) {
+        return new BreakpointSourceLocation(key, sourceElements, sourceSection, tag);
     }
 
-    static BreakpointLocation create(Object key, SourceElement[] sourceElements, int line, int column) {
-        return new BreakpointSourceLocation(key, sourceElements, line, column);
+    static BreakpointLocation create(Object key, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag) {
+        return new BreakpointSourceLocation(key, sourceElements, line, column, tag);
     }
 
     static BreakpointLocation create(SourceElement[] sourceElements, SuspensionFilter filter) {
@@ -109,10 +110,13 @@ abstract class BreakpointLocation {
 
     abstract SourceSectionFilter createLocationFilter(Source source, SuspendAnchor suspendAnchor);
 
-    private static void setTags(SourceSectionFilter.Builder f, SourceElement[] sourceElements) {
-        Class<?>[] elementTags = new Class<?>[sourceElements.length];
-        for (int i = 0; i < elementTags.length; i++) {
+    private static void setTags(SourceSectionFilter.Builder f, SourceElement[] sourceElements, Class<? extends Tag> tag) {
+        Class<?>[] elementTags = new Class<?>[sourceElements.length + ((tag == null) ? 0 : 1)];
+        for (int i = 0; i < sourceElements.length; i++) {
             elementTags[i] = sourceElements[i].getTag();
+        }
+        if (tag != null) {
+            elementTags[elementTags.length - 1] = tag;
         }
         f.tagIs(elementTags);
     }
@@ -124,17 +128,20 @@ abstract class BreakpointLocation {
         private int line;
         private int column;
 
+        private final Class<? extends Tag> tag;
+
         /**
          * @param key non-null source identifier
          * @param line 1-based line number, -1 for unspecified
          */
-        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, SourceSection sourceSection) {
+        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, SourceSection sourceSection, Class<? extends Tag> tag) {
             super(sourceElements);
             assert key instanceof Source || key instanceof URI;
             this.key = key;
             this.sourceSection = sourceSection;
             this.line = -1;
             this.column = -1;
+            this.tag = tag;
         }
 
         /**
@@ -142,7 +149,7 @@ abstract class BreakpointLocation {
          * @param line 1-based line number
          * @param column 1-based column number, -1 for unspecified
          */
-        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, int line, int column) {
+        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag) {
             super(sourceElements);
             assert key instanceof Source || key instanceof URI;
             assert line > 0 || line == -1;
@@ -151,6 +158,7 @@ abstract class BreakpointLocation {
             this.line = line;
             this.column = column;
             this.sourceSection = null;
+            this.tag = tag;
         }
 
         private BreakpointSourceLocation() {
@@ -159,6 +167,7 @@ abstract class BreakpointLocation {
             this.line = -1;
             this.column = -1;
             this.sourceSection = null;
+            this.tag = null;
         }
 
         @Override
@@ -238,7 +247,7 @@ abstract class BreakpointLocation {
                 return source.createUnavailableSection();
             }
             boolean hasColumn = column > 0;
-            SourceSection location = SuspendableLocationFinder.findNearest(source, sourceElements, line, column, suspendAnchor, env);
+            SourceSection location = SuspendableLocationFinder.findNearest(source, sourceElements, line, column, tag, suspendAnchor, env);
             if (location != null) {
                 switch (suspendAnchor) {
                     case BEFORE:
@@ -294,7 +303,7 @@ abstract class BreakpointLocation {
             if (sourceSection != null) {
                 f.sourceSectionEquals(sourceSection);
             }
-            setTags(f, sourceElements);
+            setTags(f, sourceElements, tag);
             return f.build();
         }
 
@@ -357,7 +366,7 @@ abstract class BreakpointLocation {
             }
             SourceFilter sourceFilter = sourceFilterBuilder.build();
             f.sourceFilter(sourceFilter);
-            setTags(f, sourceElements);
+            setTags(f, sourceElements, null);
             return f.build();
         }
 
