@@ -50,6 +50,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.oracle.truffle.api.instrumentation.EventContext;
+import com.oracle.truffle.api.instrumentation.Tag;
 
 /**
  * Represents a debugger step configuration. A debugger step is defined by it's depth and a set of
@@ -72,13 +73,16 @@ import com.oracle.truffle.api.instrumentation.EventContext;
  */
 public final class StepConfig {
 
-    private static final StepConfig EMPTY = new StepConfig(null, null, 0);
+    private static final StepConfig EMPTY = new StepConfig(null, null, 0, null, null);
     private static final Collection<SourceElement> allElements = Arrays.asList(SourceElement.values());
     private static final Map<SourceElement, Set<SuspendAnchor>> defaultAnchors;
 
     private final Set<SourceElement> sourceElements;
     private final Map<SourceElement, Set<SuspendAnchor>> preferredAnchors;
     private final int stepCount;
+
+    private final Class<? extends Tag> tag;
+    private final SuspendAnchor tagAnchor;
 
     static {
         Map<SourceElement, Set<SuspendAnchor>> anchors = new EnumMap<>(SourceElement.class);
@@ -90,10 +94,12 @@ public final class StepConfig {
         defaultAnchors = Collections.unmodifiableMap(anchors);
     }
 
-    StepConfig(Set<SourceElement> sourceElements, Map<SourceElement, Set<SuspendAnchor>> preferredAnchors, int count) {
+    StepConfig(Set<SourceElement> sourceElements, Map<SourceElement, Set<SuspendAnchor>> preferredAnchors, int count, Class<? extends Tag> tag, SuspendAnchor tagAnchor) {
         this.sourceElements = sourceElements;
         this.preferredAnchors = preferredAnchors;
         this.stepCount = count;
+        this.tag = tag;
+        this.tagAnchor = tagAnchor;
     }
 
     /**
@@ -118,6 +124,10 @@ public final class StepConfig {
     }
 
     boolean matches(DebuggerSession session, EventContext context, SuspendAnchor anchor) {
+        if (tag != null) {
+            return context.hasTag(tag) && this.tagAnchor == anchor;
+        }
+
         Set<SourceElement> elements = sourceElements;
         if (elements == null) {
             elements = session.getSourceElements();
@@ -128,6 +138,14 @@ public final class StepConfig {
             }
         }
         return false;
+    }
+
+    Class<? extends Tag> getTag() {
+        return tag;
+    }
+
+    SuspendAnchor getTagAnchor() {
+        return tagAnchor;
     }
 
     boolean containsSourceElement(DebuggerSession session, SourceElement sourceElement) {
@@ -157,6 +175,9 @@ public final class StepConfig {
         private Set<SourceElement> stepElements;
         private Map<SourceElement, Set<SuspendAnchor>> preferredAnchors;
         private int stepCount = -1;
+
+        private Class<? extends Tag> tag;
+        private SuspendAnchor tagAnchor;
 
         private Builder() {
         }
@@ -214,6 +235,10 @@ public final class StepConfig {
          * @since 19.0
          */
         public Builder suspendAnchors(SourceElement element, SuspendAnchor... anchors) {
+            if (this.tag != null && this.tagAnchor != null) {
+                throw new IllegalStateException("suspendAnchors() is not compatible with tag(). Use one or the other.");
+            }
+
             if (anchors.length == 0) {
                 throw new IllegalArgumentException("At least one anchor needs to be provided.");
             }
@@ -252,6 +277,27 @@ public final class StepConfig {
         }
 
         /**
+         * Set a tag to filter the applicable source sections.
+         *
+         * @since smarr/debugger
+         */
+        public Builder tag(@SuppressWarnings("hiding") Class<? extends Tag> tag, @SuppressWarnings("hiding") SuspendAnchor tagAnchor) {
+            if (this.preferredAnchors != null) {
+                throw new IllegalStateException("suspendAnchors() is not compatible with tag(). Use one or the other.");
+            }
+
+            if (this.tag != null && this.tagAnchor != null) {
+                throw new IllegalStateException("Tag and anchor can only be set once per the builder.");
+            }
+            if (tag == null && tagAnchor == null) {
+                throw new IllegalArgumentException("Tag and anchor cannot be null");
+            }
+            this.tag = tag;
+            this.tagAnchor = tagAnchor;
+            return this;
+        }
+
+        /**
          * Create a {@link StepConfig step configuration} from this builder.
          *
          * @since 0.33
@@ -272,7 +318,14 @@ public final class StepConfig {
                     }
                 }
             }
-            return new StepConfig(stepElements, preferredAnchors, stepCount);
+
+            if (tag != null) {
+                // revert the change of above. implementing it this way avoids code modifications
+                // which will be harder to maintain
+                preferredAnchors = null;
+            }
+
+            return new StepConfig(stepElements, preferredAnchors, stepCount, tag, tagAnchor);
         }
     }
 }
