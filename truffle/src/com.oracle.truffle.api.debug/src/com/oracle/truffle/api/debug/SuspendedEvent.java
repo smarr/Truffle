@@ -64,6 +64,7 @@ import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
 import com.oracle.truffle.api.instrumentation.Instrumenter;
 import com.oracle.truffle.api.instrumentation.StandardTags.RootTag;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.SourceSection;
@@ -239,13 +240,6 @@ public final class SuspendedEvent {
 
     InsertableNode getInsertableNode() {
         return insertableNode;
-    }
-
-    /**
-     * @since smarr/debugger
-     */
-    public SteppingLocation getLocation() {
-        return location;
     }
 
     /**
@@ -654,6 +648,26 @@ public final class SuspendedEvent {
     public SuspendedEvent prepareStepOver(StepConfig stepConfig) {
         verifyConfig(stepConfig);
         setNextStrategy(SteppingStrategy.createStepOver(session, stepConfig));
+        return this;
+    }
+
+    /**
+     * Step until the next element with the give tag.
+     *
+     * @since smarr/debugger
+     */
+    public SuspendedEvent prepareStepUntilNext(Class<? extends Tag> tag, SuspendAnchor anchor) {
+        return prepareStepUntilNext(StepConfig.newBuilder().tag(tag, anchor).build());
+    }
+
+    /**
+     * Step next with the given stepConfig.
+     *
+     * @since smarr/debugger
+     */
+    public SuspendedEvent prepareStepUntilNext(StepConfig stepConfig) {
+        verifyConfig(stepConfig);
+        setNextStrategy(SteppingStrategy.createStepNext(session, stepConfig));
         return this;
     }
 
