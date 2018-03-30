@@ -41,7 +41,9 @@
 package com.oracle.truffle.api.debug;
 
 import com.oracle.truffle.api.instrumentation.EventContext;
+import com.oracle.truffle.api.instrumentation.InstrumentableNode.WrapperNode;
 import com.oracle.truffle.api.instrumentation.ProbeNode;
+import com.oracle.truffle.api.nodes.Node;
 
 /**
  * Implementation of a strategy for a debugger <em>action</em> that allows execution to continue
@@ -161,6 +163,10 @@ abstract class SteppingStrategy {
 
     static SteppingStrategy createStepOver(DebuggerSession session, StepConfig config) {
         return new StepOver(session, config);
+    }
+
+    static SteppingStrategy createStepNext(DebuggerSession session, StepConfig config) {
+        return new StepNext(session, config);
     }
 
     static SteppingStrategy createUnwind(int depth) {
@@ -526,6 +532,64 @@ abstract class SteppingStrategy {
             return String.format("STEP_OVER(stackCounter=%s, stepCount=%s)", stackCounter, unfinishedStepCount);
         }
 
+    }
+
+    private static final class StepNext extends SteppingStrategy {
+        private final DebuggerSession session;
+        private final StepConfig stepConfig;
+
+        private int stackCounter;
+        private boolean activeFrame;
+        private Node targetNode;
+
+        StepNext(DebuggerSession session, StepConfig stepConfig) {
+            this.session = session;
+            this.stepConfig = stepConfig;
+        }
+
+        @Override
+        void initialize(SuspendedContext context, SuspendAnchor suspendAnchor) {
+            this.stackCounter = 0;
+        }
+
+        @Override
+        void notifyCallEntry() {
+            stackCounter += 1;
+            activeFrame = stackCounter == 0;
+        }
+
+        @Override
+        void notifyCallExit() {
+            stackCounter -= 1;
+            if (stackCounter == 0) {
+                activeFrame = true;
+            }
+        }
+
+        @Override
+        boolean isActive(EventContext context, SuspendAnchor suspendAnchor) {
+            if (targetNode == null && context.hasTag(stepConfig.getTag())) {
+                // record the target node
+                targetNode = context.getInstrumentedNode();
+                assert targetNode.getParent() instanceof WrapperNode;
+
+                // adjust the stackCounter to reflect that this is where we want to be
+                stackCounter = 0;
+                activeFrame = true;
+            }
+
+            return activeFrame &&
+                            // the target node may specialize/replace itself, though, the wrapper,
+                            // which we expect to be there, will remain the same and has a stable
+                            // identity
+                            targetNode.getParent() == context.getInstrumentedNode().getParent() &&
+                            stepConfig.matches(session, context, suspendAnchor);
+        }
+
+        @Override
+        boolean step(DebuggerSession steppingSession, EventContext context, SuspendAnchor suspendAnchor) {
+            return isActive(context, suspendAnchor);
+        }
     }
 
     static final class Unwind extends SteppingStrategy {
