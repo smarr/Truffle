@@ -40,10 +40,13 @@
  */
 package com.oracle.truffle.api.interop;
 
+import java.math.BigInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
 final class AssertUtils {
 
-    private AssertUtils() {
-    }
+    private AssertUtils() {}
 
     private static String formatArgs(Object[] args) {
         if (args == null) {
@@ -164,7 +167,12 @@ final class AssertUtils {
     @SuppressWarnings("deprecation")
     static boolean isInteropValue(Object o) {
         return o instanceof com.oracle.truffle.api.TruffleException || o instanceof TruffleObject || o instanceof Boolean || o instanceof Byte || o instanceof Short || o instanceof Integer ||
-                        o instanceof Long || o instanceof Float || o instanceof Double || o instanceof Character || o instanceof String;
+                        o instanceof Long || o instanceof Float || o instanceof Double || o instanceof Character || o instanceof String ||
+                        // SM: I need these for SOMns and don't require good interop a the moment
+                        o instanceof BigInteger ||
+                        o instanceof ReentrantLock ||
+                        o instanceof Condition ||
+                        o instanceof Object[];
     }
 
     static boolean validArguments(Object receiver, Object[] args) {
