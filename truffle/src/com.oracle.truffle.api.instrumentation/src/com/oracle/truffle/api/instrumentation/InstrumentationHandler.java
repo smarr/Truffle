@@ -1868,6 +1868,11 @@ final class InstrumentationHandler {
         private SourceSection savedParentSourceSection;
 
         public boolean visit(Node originalNode) {
+            // SM: Ignore the ProbeNode and its children
+            if (originalNode instanceof ProbeNode) {
+                return false;
+            }
+
             Node node = originalNode;
             SourceSection sourceSection = node.getSourceSection();
             boolean instrumentable = InstrumentationHandler.isInstrumentableNode(node);
