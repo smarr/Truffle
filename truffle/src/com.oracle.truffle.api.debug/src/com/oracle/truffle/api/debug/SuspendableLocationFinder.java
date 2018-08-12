@@ -78,7 +78,7 @@ final class SuspendableLocationFinder {
     private SuspendableLocationFinder() {
     }
 
-    static SourceSection findNearest(Source source, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag, SuspendAnchor anchor, TruffleInstrument.Env env) {
+    static SourceSection findNearest(Source source, SourceElement[] sourceElements, int line, int column, int sectionLength, Class<? extends Tag> tag, SuspendAnchor anchor, TruffleInstrument.Env env) {
         if (!source.hasCharacters()) {
             return null;
         }
@@ -92,7 +92,7 @@ final class SuspendableLocationFinder {
         if (boundColumn > maxColumn) {
             boundColumn = maxColumn;
         }
-        return findNearestBound(source, getElementTags(sourceElements, tag), boundLine, boundColumn, anchor, env);
+        return findNearestBound(source, getElementTags(sourceElements, tag), boundLine, boundColumn, sectionLength, anchor, env);
     }
 
     private static Set<Class<? extends Tag>> getElementTags(SourceElement[] sourceElements, Class<? extends Tag> tag) {
@@ -110,12 +110,12 @@ final class SuspendableLocationFinder {
     }
 
     private static SourceSection findNearestBound(Source source, Set<Class<? extends Tag>> elementTags,
-                    int line, int column, SuspendAnchor anchor, TruffleInstrument.Env env) {
+                    int line, int column, int sectionLength, SuspendAnchor anchor, TruffleInstrument.Env env) {
         int offset = source.getLineStartOffset(line);
         if (column > 0) {
             offset += column - 1;
         }
-        NearestSections sectionsCollector = new NearestSections(elementTags, (column <= 0) ? line : 0, offset, anchor);
+        NearestSections sectionsCollector = new NearestSections(elementTags, (column <= 0) ? line : 0, offset, sectionLength, anchor);
         // All SourceSections of the Source are loaded already when the source was executed
         env.getInstrumenter().visitLoadedSourceSections(
                         SourceSectionFilter.newBuilder().sourceIs(source).build(),
@@ -156,7 +156,9 @@ final class SuspendableLocationFinder {
         private final Set<Class<? extends Tag>> elementTags;
         private final int line;
         private final int offset;
+        private final int sectionLength;
         private final SuspendAnchor anchor;
+        private SourceSection perfectMatch;
         private SourceSection exactLineMatch;
         private SourceSection exactIndexMatch;
         private SourceSection containsMatch;
@@ -167,10 +169,11 @@ final class SuspendableLocationFinder {
         private LinkedNodes nextNode;
         private boolean isOffsetInRoot = false;
 
-        NearestSections(Set<Class<? extends Tag>> elementTags, int line, int offset, SuspendAnchor anchor) {
+        NearestSections(Set<Class<? extends Tag>> elementTags, int line, int offset, int sectionLength, SuspendAnchor anchor) {
             this.elementTags = elementTags;
             this.line = line;
             this.offset = offset;
+            this.sectionLength = sectionLength;
             this.anchor = anchor;
         }
 
@@ -188,6 +191,10 @@ final class SuspendableLocationFinder {
             }
             InstrumentableNode node = (InstrumentableNode) eventNode;
             SourceSection sourceSection = event.getSourceSection();
+            if (matchPerfectly(node, sourceSection)) {
+                // We have a perfect match, we do not need to do anything more
+                return;
+            }
             if (matchSectionLine(node, sourceSection)) {
                 // We have exact line match, we do not need to do anything more
                 return;
@@ -205,6 +212,21 @@ final class SuspendableLocationFinder {
             }
             // Offset approximation
             findOffsetApproximation(node, sourceSection, o1, o2);
+        }
+
+        private boolean matchPerfectly(InstrumentableNode node, SourceSection sourceSection) {
+            if (sectionLength > 0) {
+                if (perfectMatch == null &&
+                                sourceSection.getCharIndex() == offset &&
+                                sourceSection.getCharLength() == sectionLength &&
+                                isTaggedWith(node, elementTags)) {
+                    perfectMatch = sourceSection;
+                }
+                if (perfectMatch != null) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private boolean matchSectionLine(InstrumentableNode node, SourceSection sourceSection) {
@@ -300,6 +322,9 @@ final class SuspendableLocationFinder {
         }
 
         SourceSection getExactSection() {
+            if (perfectMatch != null) {
+                return perfectMatch;
+            }
             if (exactLineMatch != null) {
                 return exactLineMatch;
             }
