@@ -80,8 +80,8 @@ abstract class BreakpointLocation {
         return new BreakpointSourceLocation(key, sourceElements, sourceSection, tag);
     }
 
-    static BreakpointLocation create(Object key, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag) {
-        return new BreakpointSourceLocation(key, sourceElements, line, column, tag);
+    static BreakpointLocation create(Object key, SourceElement[] sourceElements, int line, int column, int sectionLength, Class<? extends Tag> tag) {
+        return new BreakpointSourceLocation(key, sourceElements, line, column, sectionLength, tag);
     }
 
     static BreakpointLocation create(SourceElement[] sourceElements, SuspensionFilter filter) {
@@ -127,6 +127,9 @@ abstract class BreakpointLocation {
         private final SourceSection sourceSection;
         private int line;
         private int column;
+        private int sectionLength;
+
+        private SourceSection perfectMatch;
 
         private final Class<? extends Tag> tag;
 
@@ -141,6 +144,7 @@ abstract class BreakpointLocation {
             this.sourceSection = sourceSection;
             this.line = -1;
             this.column = -1;
+            this.sectionLength = -1;
             this.tag = tag;
         }
 
@@ -149,7 +153,7 @@ abstract class BreakpointLocation {
          * @param line 1-based line number
          * @param column 1-based column number, -1 for unspecified
          */
-        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, int line, int column, Class<? extends Tag> tag) {
+        BreakpointSourceLocation(Object key, SourceElement[] sourceElements, int line, int column, int sectionLength, Class<? extends Tag> tag) {
             super(sourceElements);
             assert key instanceof Source || key instanceof URI;
             assert line > 0 || line == -1;
@@ -157,6 +161,7 @@ abstract class BreakpointLocation {
             this.key = key;
             this.line = line;
             this.column = column;
+            this.sectionLength = sectionLength;
             this.sourceSection = null;
             this.tag = tag;
         }
@@ -166,6 +171,7 @@ abstract class BreakpointLocation {
             this.key = null;
             this.line = -1;
             this.column = -1;
+            this.sectionLength = -1;
             this.sourceSection = null;
             this.tag = null;
         }
@@ -240,6 +246,9 @@ abstract class BreakpointLocation {
             if (sourceSection != null) {
                 return sourceSection;
             }
+            if (perfectMatch != null) {
+                return perfectMatch;
+            }
             if (key == null) {
                 return null;
             }
@@ -247,23 +256,32 @@ abstract class BreakpointLocation {
                 return source.createUnavailableSection();
             }
             boolean hasColumn = column > 0;
-            SourceSection location = SuspendableLocationFinder.findNearest(source, sourceElements, line, column, tag, suspendAnchor, env);
+            boolean hasLength = sectionLength > 0;
+            SourceSection location = SuspendableLocationFinder.findNearest(source, sourceElements, line, column, sectionLength, tag, suspendAnchor, env);
             if (location != null) {
-                switch (suspendAnchor) {
-                    case BEFORE:
-                        line = location.getStartLine();
-                        if (hasColumn) {
-                            column = location.getStartColumn();
-                        }
-                        break;
-                    case AFTER:
-                        line = location.getEndLine();
-                        if (hasColumn) {
-                            column = location.getEndColumn();
-                        }
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Unknown suspend anchor: " + suspendAnchor);
+                if (hasLength && hasColumn &&
+                                line == location.getStartLine() &&
+                                column == location.getStartColumn() &&
+                                sectionLength == location.getCharLength()) {
+                    assert perfectMatch == null;
+                    perfectMatch = location;
+                } else {
+                    switch (suspendAnchor) {
+                        case BEFORE:
+                            line = location.getStartLine();
+                            if (hasColumn) {
+                                column = location.getStartColumn();
+                            }
+                            break;
+                        case AFTER:
+                            line = location.getEndLine();
+                            if (hasColumn) {
+                                column = location.getEndColumn();
+                            }
+                            break;
+                        default:
+                            throw new IllegalArgumentException("Unknown suspend anchor: " + suspendAnchor);
+                    }
                 }
             }
             return location;
@@ -282,7 +300,7 @@ abstract class BreakpointLocation {
                     f.sourceFilter(createSourceFilter());
                 }
             }
-            if (line != -1) {
+            if (perfectMatch == null && line != -1) {
                 switch (suspendAnchor) {
                     case BEFORE:
                         f.lineStartsIn(IndexRange.byLength(line, 1));
@@ -302,6 +320,9 @@ abstract class BreakpointLocation {
             }
             if (sourceSection != null) {
                 f.sourceSectionEquals(sourceSection);
+                assert perfectMatch == null;
+            } else if (perfectMatch != null) {
+                f.sourceSectionEquals(perfectMatch);
             }
             setTags(f, sourceElements, tag);
             return f.build();
@@ -319,7 +340,7 @@ abstract class BreakpointLocation {
             } else {
                 keyDescription = key.toString();
             }
-            return keyDescription + ", line=" + line + ", column=" + column;
+            return keyDescription + ", line=" + line + ", column=" + column + ", length=" + sectionLength;
         }
 
     }
