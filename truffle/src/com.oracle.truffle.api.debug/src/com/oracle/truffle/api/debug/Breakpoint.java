@@ -922,6 +922,7 @@ public class Breakpoint {
         private int line = -1;
         private SuspendAnchor anchor = SuspendAnchor.BEFORE;
         private int column = -1;
+        private int sectionLength = -1;
         private ResolveListener resolveListener;
         private int ignoreCount;
         private boolean oneShot;
@@ -1002,6 +1003,36 @@ public class Breakpoint {
                 throw new IllegalStateException("ColumnIs can only be called after a line is set.");
             }
             this.column = column;
+            return this;
+        }
+
+        /**
+         * Specifies the breakpoint's section length and makes this breakpoint precise. This means
+         * that Truffle won't try to adjust the breakpoint to a possible adjacent location.
+         *
+         * <p>
+         * Requires {@link #columnIs(int) starting column} to be set as well.
+         *
+         * <p>
+         * Can only be invoked once per builder. Cannot be used together with
+         * {@link Breakpoint#newBuilder(SourceSection)}.
+         *
+         * @param length number of characters in the source section
+         * @throws IllegalStateException if {@code length < 1}
+         *
+         * @since smarr/debugger
+         */
+        public Builder sectionLength(int length) {
+            if (length <= 0) {
+                throw new IllegalArgumentException("Length argument must be > 0.");
+            }
+            if (this.sectionLength != -1) {
+                throw new IllegalStateException("SectionLength can only be called once per breakpoint builder.");
+            }
+            if (sourceSection != null) {
+                throw new IllegalArgumentException("SectionLength cannot be used with source section based breakpoint. ");
+            }
+            this.sectionLength = length;
             return this;
         }
 
@@ -1102,6 +1133,12 @@ public class Breakpoint {
          * @since 0.17
          */
         public Breakpoint build() {
+            if (sectionLength != -1) {
+                if (column == -1) {
+                    throw new IllegalArgumentException("If sectionLength is set, we also need column to be set.");
+                }
+            }
+
             if (sourceElements == null) {
                 sourceElements = new SourceElement[]{SourceElement.STATEMENT};
             }
@@ -1109,7 +1146,7 @@ public class Breakpoint {
             if (sourceSection != null) {
                 location = BreakpointLocation.create(key, sourceElements, sourceSection, tag);
             } else {
-                location = BreakpointLocation.create(key, sourceElements, line, column, tag);
+                location = BreakpointLocation.create(key, sourceElements, line, column, sectionLength, tag);
             }
             Breakpoint breakpoint = new Breakpoint(
                             location, anchor, oneShot, null,
