@@ -198,6 +198,8 @@ public final class DebuggerSession implements Closeable {
     private final Collection<Breakpoint> breakpointsUnresolved = ConcurrentHashMap.newKeySet();
     private volatile boolean breakpointsUnresolvedEmpty = true;
 
+    private final Class<Tag>[] customSourceElements;
+
     private EventBinding<? extends ExecutionEventNodeFactory> syntaxElementsBinding;
     final Set<EventBinding<? extends ExecutionEventNodeFactory>> allBindings = Collections.synchronizedSet(new HashSet<>());
 
@@ -221,10 +223,14 @@ public final class DebuggerSession implements Closeable {
 
     private volatile boolean closed;
 
-    DebuggerSession(Debugger debugger, SuspendedCallback callback, SourceElement... sourceElements) {
+    DebuggerSession(Debugger debugger, SuspendedCallback callback, Class<Tag>[] customSourceElements, SourceElement... sourceElements) {
         this.sessionId = SESSIONS.incrementAndGet();
         this.debugger = debugger;
         this.callback = callback;
+
+        this.customSourceElements = customSourceElements;
+        assert customSourceElements != null : "At least an empty array, for customSourceElements";
+
         switch (sourceElements.length) {
             case 0:
                 this.sourceElements = Collections.emptySet();
@@ -532,7 +538,7 @@ public final class DebuggerSession implements Closeable {
     private void addBindings(boolean includeInternalCode, Predicate<Source> sFilter) {
         if (syntaxElementsBinding == null) {
             if (!sourceElements.isEmpty()) {
-                Class<?>[] syntaxTags = new Class<?>[this.sourceElements.size() + (hasRootElement ? 0 : 1)];
+                Class<?>[] syntaxTags = new Class<?>[this.sourceElements.size() + (hasRootElement ? 0 : 1) + this.customSourceElements.length];
                 int i = 0;
                 for (SourceElement element : this.sourceElements) {
                     syntaxTags[i++] = element.getTag();
@@ -540,6 +546,10 @@ public final class DebuggerSession implements Closeable {
                 assert i == sourceElements.size();
                 if (!hasRootElement) {
                     syntaxTags[i] = RootTag.class;
+                    i++;
+                }
+                for (int j = 0; j < this.customSourceElements.length; j++, i++) {
+                    syntaxTags[i] = this.customSourceElements[j];
                 }
                 this.syntaxElementsBinding = createBinding(includeInternalCode, sFilter, new ExecutionEventNodeFactory() {
                     @Override
