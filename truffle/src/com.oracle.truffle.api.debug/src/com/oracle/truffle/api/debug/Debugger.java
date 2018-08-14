@@ -57,6 +57,7 @@ import com.oracle.truffle.api.debug.impl.DebuggerInstrument;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.impl.Accessor;
 import com.oracle.truffle.api.instrumentation.Instrumenter;
+import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument.Env;
 import com.oracle.truffle.api.nodes.Node;
@@ -119,7 +120,18 @@ public final class Debugger {
      * @since 0.17
      */
     public DebuggerSession startSession(SuspendedCallback callback) {
-        return startSession(callback, SourceElement.STATEMENT);
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Class<Tag>[] tags = new Class[0];
+        return startSession(callback, tags, SourceElement.STATEMENT);
+    }
+
+    /**
+     * @since smarr/debugger
+     */
+    public DebuggerSession startSession(SuspendedCallback callback, SourceElement... defaultSourceElements) {
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Class<Tag>[] tags = new Class[0];
+        return startSession(callback, tags, defaultSourceElements);
     }
 
     /**
@@ -137,8 +149,8 @@ public final class Debugger {
      * @see SuspendedEvent
      * @since 0.33
      */
-    public DebuggerSession startSession(SuspendedCallback callback, SourceElement... defaultSourceElements) {
-        DebuggerSession session = new DebuggerSession(this, callback, defaultSourceElements);
+    public DebuggerSession startSession(SuspendedCallback callback, Class<Tag>[] customSourceElements, SourceElement... defaultSourceElements) {
+        DebuggerSession session = new DebuggerSession(this, callback, customSourceElements, defaultSourceElements);
         Breakpoint[] bpts;
         synchronized (this) {
             sessions.add(session);
