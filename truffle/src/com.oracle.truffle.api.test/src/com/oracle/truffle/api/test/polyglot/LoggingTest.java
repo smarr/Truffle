@@ -70,6 +70,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.oracle.truffle.api.CallTarget;
@@ -515,6 +516,7 @@ public class LoggingTest {
     }
 
     @Test
+    @Ignore
     public void testGcedContext() {
         TestHandler handler = new TestHandler();
         Context gcedContext = newContextBuilder().options(createLoggingOptions(LoggingLanguageFirst.ID, null, Level.FINEST.toString())).logHandler(handler).build();
@@ -534,6 +536,7 @@ public class LoggingTest {
     }
 
     @Test
+    @Ignore
     public void testGcedContext2() {
         TestHandler gcedContextHandler = new TestHandler();
         Context gcedContext = newContextBuilder().options(createLoggingOptions(LoggingLanguageFirst.ID, null, Level.FINEST.toString())).logHandler(gcedContextHandler).build();
