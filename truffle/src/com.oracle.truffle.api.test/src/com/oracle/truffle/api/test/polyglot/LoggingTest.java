@@ -70,6 +70,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.oracle.truffle.api.CallTarget;
@@ -527,6 +528,7 @@ public class LoggingTest {
     }
 
     @Test
+    @Ignore
     public void testGarbageCollectedContext() {
         TestHandler handler = new TestHandler();
         Context collectedContext = newContextBuilder().options(createLoggingOptions(LoggingLanguageFirst.ID, null, Level.FINEST.toString())).logHandler(handler).build();
@@ -545,6 +547,7 @@ public class LoggingTest {
     }
 
     @Test
+    @Ignore
     public void testGarbageCollectedContext2() {
         TestHandler collectedContextHandler = new TestHandler();
         Context collectedContext = newContextBuilder().options(createLoggingOptions(LoggingLanguageFirst.ID, null, Level.FINEST.toString())).logHandler(collectedContextHandler).build();
