@@ -84,6 +84,7 @@ import com.oracle.truffle.api.instrumentation.InstrumentableNode;
 import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter.Builder;
+import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.StandardTags.RootTag;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument;
@@ -619,6 +620,12 @@ public final class DebuggerSession implements Closeable {
     public void prepareStepUntilNext(Class<? extends Tag> tag, SuspendAnchor anchor, Thread thread) {
         StepConfig stepConfig = StepConfig.newBuilder().tag(tag, anchor).build();
         SteppingStrategy strat = SteppingStrategy.createStepNext(this, stepConfig);
+        setSteppingStrategy(thread, strat, true);
+    }
+
+    public void prepareStepEndTurn(Thread thread, final Node node, String messageSelector, ArrayList<RootNode> stackFrames) {
+        StepConfig stepConfig = StepConfig.newBuilder().tag(StandardTags.RootTag.class, SuspendAnchor.AFTER).build();
+        SteppingStrategy strat = SteppingStrategy.createStepEndTurn(this, stepConfig, node, messageSelector, stackFrames);
         setSteppingStrategy(thread, strat, true);
     }
 

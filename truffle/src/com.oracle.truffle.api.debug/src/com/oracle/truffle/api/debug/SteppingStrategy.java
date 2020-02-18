@@ -44,6 +44,10 @@ import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode.WrapperNode;
 import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.nodes.Node;
+import com.oracle.truffle.api.nodes.RootNode;
+import com.oracle.truffle.api.source.SourceSection;
+
+import java.util.ArrayList;
 
 /**
  * Implementation of a strategy for a debugger <em>action</em> that allows execution to continue
@@ -167,6 +171,10 @@ abstract class SteppingStrategy {
 
     static SteppingStrategy createStepNext(DebuggerSession session, StepConfig config) {
         return new StepNext(session, config);
+    }
+
+    static SteppingStrategy createStepEndTurn(DebuggerSession session, StepConfig config, final Node node, String messageSelector, ArrayList<RootNode> rootNodeFrames) {
+        return new StepEndTurn(session, config, node, messageSelector, rootNodeFrames);
     }
 
     static SteppingStrategy createUnwind(int depth, DebugValue returnValue) {
@@ -584,6 +592,202 @@ abstract class SteppingStrategy {
                             // identity
                             targetNode.getParent() == context.getInstrumentedNode().getParent() &&
                             stepConfig.matches(session, context, suspendAnchor);
+        }
+
+        @Override
+        boolean step(DebuggerSession steppingSession, EventContext context, SuspendAnchor suspendAnchor) {
+            return isActive(context, suspendAnchor);
+        }
+    }
+
+    private static final class StepEndTurn extends SteppingStrategy {
+        private final DebuggerSession session;
+        private final StepConfig stepConfig;
+
+        private int stackCounter;
+        private boolean activeFrame;
+        private Node targetNode;
+        private SourceSection turnSuspendedSourceSection;
+        private String messageSelector;
+        private ArrayList<RootNode> rootNodeFrames;
+
+        StepEndTurn(DebuggerSession session, StepConfig stepConfig, Node suspendedNode, String messageSelector, ArrayList<RootNode> rootNodeFrames) {
+            this.session = session;
+            this.stepConfig = stepConfig;
+            this.messageSelector = messageSelector;
+            this.rootNodeFrames = rootNodeFrames;
+            this.turnSuspendedSourceSection = getTurnSourceSectionForNode(suspendedNode);
+        }
+
+        @Override
+        void initialize(SuspendedContext context, SuspendAnchor suspendAnchor) {
+            this.stackCounter = 0;
+        }
+
+        @Override
+        void notifyNodeEntry(EventContext context) {
+            super.notifyNodeEntry(context);
+        }
+
+        @Override
+        void notifyNodeExit(EventContext context) {
+            super.notifyNodeExit(context);
+        }
+
+        @Override
+        void notifyCallEntry() {
+            stackCounter += 1;
+            activeFrame = stackCounter == 0;
+        }
+
+        @Override
+        void notifyCallExit() {
+            stackCounter -= 1;
+            if (stackCounter == 0) {
+                activeFrame = true;
+            }
+        }
+
+        @Override
+        boolean isActive(EventContext context, SuspendAnchor suspendAnchor) {
+            boolean currentTurn = false;
+
+            // step to the next root node and check if the targetNode belongs to the suspended
+            // method/turn
+            if (context.hasTag(stepConfig.getTag())) {
+                // record the target node
+                targetNode = context.getInstrumentedNode();
+                assert targetNode.getParent() instanceof WrapperNode;
+
+                SourceSection targetSourceSection = getMethodSourceSectionForNode(targetNode);
+
+                if (turnSuspendedSourceSection != null && turnSuspendedSourceSection.equals(targetSourceSection)) {
+                    currentTurn = true;
+                    // adjust the stackCounter to reflect that this is where we want to be
+                    stackCounter = 0;
+                    activeFrame = true;
+                }
+            }
+
+            boolean active = activeFrame &&
+                            targetNode.getParent() == context.getInstrumentedNode().getParent() &&
+                            stepConfig.matches(session, context, suspendAnchor) &&
+                            currentTurn;
+
+            return active;
+        }
+
+        /**
+         * Return the source section of the turn where this node belongs. A turn is represented by
+         * the processing of an asynchronous message by an actor. This method checks if the given
+         * node is located in a turn based on the selector of the message that was sent. Note:
+         * comparison using the source section is not possible at the moment.
+         *
+         * @param node
+         * @return
+         */
+        private SourceSection getTurnSourceSectionForNode(Node node) {
+            if (node == null) {
+                return null;
+            }
+
+            if (node instanceof RootNode) { // refers to the method
+                String rootNodeName = ((RootNode) node).getName();
+
+                // compare by the selector of the message
+                if (rootNodeName.equals(this.messageSelector)) {
+                    // node method corresponds to the turn executed
+                    return node.getSourceSection();
+                } else {
+                    // node method belongs to synchronous call
+                    // return source section of the corresponding turn for this node
+                    Node callingNode = getCallingMethodForRootNode(node);
+                    return getTurnSourceSectionForNode(callingNode);
+                }
+
+            } else {
+                if (node.getParent() instanceof WrapperNode) {
+                    return getTurnSourceSectionForNode(node.getParent().getParent()); // refers to
+                                                                                      // the child
+                                                                                      // of the
+                                                                                      // proxy node
+                } else {
+                    return getTurnSourceSectionForNode(node.getParent());
+                }
+            }
+        }
+
+        /**
+         * Return the source section of the method where this node is declared.
+         *
+         * @param node
+         * @return
+         */
+        private SourceSection getMethodSourceSectionForNode(Node node) {
+            if (node instanceof RootNode) { // refers to the method
+                return node.getSourceSection();
+
+            } else {
+                if (node.getParent() instanceof WrapperNode) {
+                    return getMethodSourceSectionForNode(node.getParent().getParent()); // refers to
+                                                                                        // the child
+                                                                                        // of the
+                                                                                        // wrapper
+                                                                                        // node
+                } else {
+                    return getMethodSourceSectionForNode(node.getParent());
+                }
+            }
+        }
+
+        /**
+         * Get the node corresponding to the parent method call where the node is declared.
+         *
+         * @param node
+         * @return
+         */
+        private Node getCallingMethodForRootNode(Node node) {
+            assert node instanceof RootNode;
+            boolean isNonMethodCall = false;
+            SourceSection sourceSection = node.getSourceSection();
+
+            if (sourceSection == null) { // Block on: do: primitive
+                return rootNodeFrames.get(rootNodeFrames.size() - 2); // return Platform>>start node
+            }
+
+            int index = 0;
+            for (RootNode frame : rootNodeFrames) {
+                index++;
+                if (frame.getSourceSection() == null) {
+                    return null;
+                }
+
+                if (frame.getSourceSection().equals(sourceSection) || isNonMethodCall) {
+                    // if the frame does not corresponds to a method call we need to check for the
+                    // next frame
+                    RootNode nextFrame = rootNodeFrames.get(index);
+                    if (nextFrame != null && nextFrame.getName() != null) { // frame corresponding
+                                                                            // to actor executor
+                        if (nextFrame.getName().contains(">>#λ")) { // TODO check if this condition
+                                                                    // is sufficient?
+                            isNonMethodCall = true;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (index > 0) {
+                return rootNodeFrames.get(index);
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        boolean isDone() {
+            return super.isDone();
         }
 
         @Override
