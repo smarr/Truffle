@@ -793,6 +793,9 @@ final class InstrumentationHandler {
         return root;
     }
 
+    /**
+     * @since smarr/debugger
+     */
     public void onNodeInserted(RootNode rootNode, Node tree) {
         // for input filters to be updated correctly we need to
         // start traversing with the parent instrumentable node.

@@ -476,6 +476,9 @@ public final class DebugStackFrame {
         return findTruffleFrame(FrameAccess.READ_ONLY);
     }
 
+    /**
+     * @since smarr/debugger
+     */
     public RootNode getRootNode() {
         return findCurrentRoot();
     }
