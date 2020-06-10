@@ -250,6 +250,8 @@ public final class SuspendedEvent {
 
     /**
      * SM: Reintroduce getNode(). Removed from Truffle 0.25
+     *
+     * @since smarr/debugger
      */
     public Node getNode() {
         return context.getInstrumentedNode();
