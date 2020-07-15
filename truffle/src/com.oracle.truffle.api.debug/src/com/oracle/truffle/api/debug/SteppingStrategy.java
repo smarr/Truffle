@@ -767,7 +767,7 @@ abstract class SteppingStrategy {
                     // next frame
                     RootNode nextFrame = rootNodeFrames.get(index);
                     if (nextFrame != null && nextFrame.getName() != null) { // frame corresponding
-                                                                            // to actor executor
+                                                                            // to executor root node
                         if (nextFrame.getName().contains(">>#λ")) { // TODO check if this condition
                                                                     // is sufficient?
                             isNonMethodCall = true;
