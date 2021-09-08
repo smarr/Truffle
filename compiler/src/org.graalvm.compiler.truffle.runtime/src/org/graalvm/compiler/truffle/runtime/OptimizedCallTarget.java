@@ -548,9 +548,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the interpreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke(args);
-        }
         return profiledPERoot(args);
     }
 
@@ -613,14 +610,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot(Object[] originalArguments) {
         Object[] args = originalArguments;
-        if (GraalCompilerDirectives.hasNextTier()) {
-            firstTierCall();
-        }
-        if (CompilerDirectives.inCompiledCode()) {
-            args = injectArgumentsProfile(originalArguments);
-        }
         Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args), getTier());
-        profileReturnValue(result);
         return result;
     }
 
