@@ -60,20 +60,7 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
 
     @Override
     public Object call(Object... arguments) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
-        if (GraalCompilerDirectives.hasNextTier()) {
-            incrementCallCount();
-        }
-        try {
-            return target.callDirect(this, arguments);
-        } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
-        }
+        return ((OptimizedCallTarget) this.callTarget).callDirect(this, arguments);
     }
 
     @SuppressWarnings("unchecked")
