@@ -548,10 +548,20 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the interpreter call
          * performance.
          */
+        if (interpreterCall()) {
+            return doInvoke(args);
+        }
         return profiledPERoot(args);
     }
 
     private boolean interpreterCall() {
+        int intCallCount = this.callCount;
+        this.callCount = intCallCount == Integer.MAX_VALUE ? intCallCount : ++intCallCount;
+
+        if (intCallCount < 3) {
+            return false;
+        }
+
         boolean bypassedInstalledCode = false;
         if (isValid()) {
             // Native entry stubs were deoptimized => reinstall.
@@ -559,8 +569,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             bypassedInstalledCode = true;
         }
         ensureInitialized();
-        int intCallCount = this.callCount;
-        this.callCount = intCallCount == Integer.MAX_VALUE ? intCallCount : ++intCallCount;
+
         int intLoopCallCount = this.callAndLoopCount;
         this.callAndLoopCount = intLoopCallCount == Integer.MAX_VALUE ? intLoopCallCount : ++intLoopCallCount;
 
@@ -610,7 +619,19 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot(Object[] originalArguments) {
         Object[] args = originalArguments;
+
+        if (callCount < 3) {
+            return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args), getTier());
+        }
+
+        if (GraalCompilerDirectives.hasNextTier()) {
+            firstTierCall();
+        }
+        if (CompilerDirectives.inCompiledCode()) {
+            args = injectArgumentsProfile(originalArguments);
+        }
         Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args), getTier());
+        profileReturnValue(result);
         return result;
     }
 
