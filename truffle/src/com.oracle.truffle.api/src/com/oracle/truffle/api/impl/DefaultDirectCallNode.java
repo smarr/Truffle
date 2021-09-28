@@ -60,6 +60,11 @@ public final class DefaultDirectCallNode extends DirectCallNode {
     }
 
     @Override
+    public Object call2(Object arg1, Object arg2) {
+        return ((DefaultCallTarget) callTarget).call2DirectOrIndirect(this, arg1, arg2);
+    }
+
+    @Override
     public void forceInlining() {
         inliningForced = true;
     }

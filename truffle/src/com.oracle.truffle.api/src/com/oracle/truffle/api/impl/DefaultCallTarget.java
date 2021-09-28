@@ -90,6 +90,22 @@ public final class DefaultCallTarget implements RootCallTarget {
         }
     }
 
+    Object call2DirectOrIndirect(final Node callNode, Object arg1, Object arg2) {
+        if (!this.initialized) {
+            initialize();
+        }
+        final DefaultArg2VirtualFrame frame = new DefaultArg2VirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2);
+        DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
+        try {
+            return rootNode.execute(frame);
+        } catch (Throwable t) {
+            DefaultRuntimeAccessor.LANGUAGE.onThrowable(callNode, this, t, frame);
+            throw t;
+        } finally {
+            getRuntime().popFrame(callerFrame);
+        }
+    }
+
     @Override
     public Object call(Object... args) {
         // Use the encapsulating node as call site and clear it inside as we cross the call boundary

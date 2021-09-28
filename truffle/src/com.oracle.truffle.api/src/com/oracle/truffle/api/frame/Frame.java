@@ -43,7 +43,7 @@ package com.oracle.truffle.api.frame;
 /**
  * Represents a frame containing values of local variables of the guest language. Instances of this
  * type must not be stored in a field or cast to {@link java.lang.Object}.
- * 
+ *
  * @since 0.8 or earlier
  */
 public interface Frame {
@@ -62,6 +62,10 @@ public interface Frame {
      * @since 0.8 or earlier
      */
     Object[] getArguments();
+
+    Object getArgument1();
+
+    Object getArgument2();
 
     /**
      * Read access to a local variable of type {@link Object}.
@@ -210,49 +214,49 @@ public interface Frame {
 
     /**
      * Check whether the given {@link FrameSlot} is of type object.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isObject(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type byte.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isByte(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type boolean.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isBoolean(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type int.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isInt(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type long.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isLong(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type float.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isFloat(FrameSlot slot);
 
     /**
      * Check whether the given {@link FrameSlot} is of type double.
-     * 
+     *
      * @since 0.8 or earlier
      */
     boolean isDouble(FrameSlot slot);

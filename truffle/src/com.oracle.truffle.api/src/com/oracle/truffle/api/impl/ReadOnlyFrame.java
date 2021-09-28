@@ -66,6 +66,14 @@ class ReadOnlyFrame implements Frame {
         return delegate.getArguments().clone();
     }
 
+    public Object getArgument1() {
+        return delegate.getArgument1();
+    }
+
+    public Object getArgument2() {
+        return delegate.getArgument2();
+    }
+
     @Override
     @TruffleBoundary
     public Object getObject(FrameSlot slot) throws FrameSlotTypeException {
