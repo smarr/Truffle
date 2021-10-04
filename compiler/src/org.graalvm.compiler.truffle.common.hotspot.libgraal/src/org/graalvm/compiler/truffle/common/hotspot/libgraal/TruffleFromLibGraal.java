@@ -75,6 +75,7 @@ public @interface TruffleFromLibGraal {
         GetCallNodes(Object[].class, Object.class),
         GetCallTargetForCallNode(long.class, Object.class, long.class),
         GetCompilableCallCount(int.class, Object.class),
+        GetCompilableNumberOfArguments(int.class, Object.class),
         GetCompilableName(String.class, Object.class),
         GetConstantFieldInfo(int.class, Object.class, long.class, boolean.class, int.class),
         GetCurrentCallTarget(Object.class, Object.class),

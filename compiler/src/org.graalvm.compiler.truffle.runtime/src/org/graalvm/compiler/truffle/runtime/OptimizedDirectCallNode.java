@@ -76,6 +76,24 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
         }
     }
 
+    @Override
+    public Object call2(Object arg1, Object arg2) {
+        OptimizedCallTarget target = getCurrentCallTarget();
+        if (CompilerDirectives.inInterpreter()) {
+            target = onInterpreterCall(target);
+        }
+        if (GraalCompilerDirectives.inFirstTier()) {
+            incrementCallCount();
+        }
+        try {
+            return target.call2Direct(this, arg1, arg2);
+        } catch (Throwable t) {
+            Throwable profiledT = profileExceptionType(t);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
+            throw OptimizedCallTarget.rethrow(profiledT);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private <T extends Throwable> T profileExceptionType(T value) {
         Class<? extends Throwable> clazz = exceptionProfile;

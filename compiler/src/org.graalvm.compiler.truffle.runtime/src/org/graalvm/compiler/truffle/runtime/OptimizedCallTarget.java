@@ -207,6 +207,14 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         public Class<?>[] getTypes() {
             return types;
         }
+
+        public int getNumberOfArguments() {
+            if (types == null) {
+                return -1;
+            }
+
+            return types.length;
+        }
     }
 
     public static final class ReturnProfile {
@@ -343,6 +351,11 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         return GraalRuntimeAccessor.NODES.isTrivial(rootNode);
     }
 
+    @Override
+    public int getNumberOfArguments() {
+        return argumentsProfile.getNumberOfArguments();
+    }
+
     /**
      * We intentionally do not synchronize here since as it's not worth the sync costs.
      */
@@ -410,10 +423,36 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
+    @Override
+    @TruffleBoundary
+    public final Object call2(Object arg1, Object arg2) {
+        // Use the encapsulating node as call site and clear it inside as we cross the call boundary
+        EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
+        Node prev = encapsulating.set(null);
+        try {
+            profileArguments2(arg1, arg2);
+            return call2Indirect(prev, arg1, arg2);
+        } catch (Throwable t) {
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
+            throw rethrow(t);
+        } finally {
+            encapsulating.set(prev);
+        }
+    }
+
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     public Object callIndirect(Node location, Object... args) {
         try {
             return doInvoke(args);
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
+    public Object call2Indirect(Node location, Object arg1, Object arg2) {
+        try {
+            return doInvoke2(arg1, arg2);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -427,6 +466,25 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
                 Object result;
                 profileArguments(args);
                 result = doInvoke(args);
+                if (CompilerDirectives.inCompiledCode()) {
+                    result = injectReturnValueProfile(result);
+                }
+                return result;
+            } catch (Throwable t) {
+                throw rethrow(profileExceptionType(t));
+            }
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
+    public final Object call2Direct(Node location, Object arg1, Object arg2) {
+        try {
+            try {
+                Object result;
+                profileArguments2(arg1, arg2);
+                result = doInvoke2(arg1, arg2);
                 if (CompilerDirectives.inCompiledCode()) {
                     result = injectReturnValueProfile(result);
                 }
@@ -459,11 +517,25 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
+    public final Object call2Inlined(Node location, Object arg1, Object arg2) {
+        try {
+            ensureInitialized();
+            return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), arg1, arg2));
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
     /**
      * Overridden by SVM.
      */
     protected Object doInvoke(Object[] args) {
         return callBoundary(args);
+    }
+
+    protected Object doInvoke2(Object arg1, Object arg2) {
+        return callBoundary2(arg1, arg2);
     }
 
     @TruffleCallBoundary
@@ -480,6 +552,22 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             return doInvoke(args);
         }
         return profiledPERoot(args);
+    }
+
+    @TruffleCallBoundary
+    protected final Object callBoundary2(Object arg1, Object arg2) {
+        /*
+         * Note this method compiles without any inlining or other optimizations. It is therefore
+         * important that this method stays small. It is compiled as a special stub that calls into
+         * the optimized code or if the call target is not yet optimized calls into profiledPERoot
+         * directly. In order to avoid deoptimizations in this method it has optimizations disabled.
+         * Any additional code here will likely have significant impact on the intepreter call
+         * performance.
+         */
+        if (interpreterCall()) {
+            return doInvoke2(arg1, arg2);
+        }
+        return profiledPERoot2(arg1, arg2);
     }
 
     private boolean interpreterCall() {
@@ -526,6 +614,33 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             args = injectArgumentsProfile(originalArguments);
         }
         Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args));
+        profileReturnValue(result);
+        return result;
+    }
+
+    // Note: {@code PartialEvaluator} looks up this method by name and signature.
+    protected final Object profiledPERoot2(Object originalArg1, Object originalArg2) {
+        if (GraalCompilerDirectives.inFirstTier()) {
+            firstTierCall();
+        }
+        if (CompilerDirectives.inCompiledCode()) {
+            ArgumentsProfile argumentsProfile = this.argumentsProfile;
+            if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
+                Class<?>[] types = argumentsProfile.types;
+                boolean isCallProfiled = callProfiled;
+                // callProfiled: only the receiver type is exact.
+                Class<?> targetType = types[0];
+                boolean exact = true;
+                originalArg1 = targetType != null ? unsafeCast(originalArg1, targetType, true, true, exact) : originalArg1;
+
+                targetType = types[1];
+                exact = !isCallProfiled;
+                originalArg2 = targetType != null ? unsafeCast(originalArg2, targetType, true, true, exact) : originalArg2;
+            }
+        }
+
+        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2));
+
         profileReturnValue(result);
         return result;
     }
@@ -936,6 +1051,10 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         return new FrameWithoutBoxing(descriptor, args);
     }
 
+    public static VirtualFrame createFrame(FrameDescriptor descriptor, Object arg1, Object arg2) {
+        return new FrameWithoutBoxing2(descriptor, arg1, arg2);
+    }
+
     final void onLoopCount(int count) {
         assert count >= 0;
         int oldLoopCallCount = this.callAndLoopCount;
@@ -1167,6 +1286,41 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
+    @ExplodeLoop
+    public final void profileArguments2(Object arg1, Object arg2) {
+        assert !callProfiled;
+        ArgumentsProfile argumentsProfile = this.argumentsProfile;
+        if (argumentsProfile == null) {
+            if (CompilerDirectives.inInterpreter()) {
+                initializeProfiledArgumentTypes2(arg1, arg2);
+            }
+        } else {
+            Class<?>[] types = argumentsProfile.types;
+            if (types != null) {
+                if (types.length != 1) {
+                    CompilerDirectives.transferToInterpreterAndInvalidate();
+                    transitionToInvalidArgumentsProfile();
+                } else if (argumentsProfile.assumption.isValid()) {
+                    Class<?> type = types[0];
+                    Object value = arg1;
+                    if (type != null && (value == null || value.getClass() != type)) {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        updateProfiledArgumentTypes2(arg1, arg2, argumentsProfile);
+                        return;
+                    }
+
+                    type = types[1];
+                    value = arg2;
+                    if (type != null && (value == null || value.getClass() != type)) {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        updateProfiledArgumentTypes2(arg1, arg2, argumentsProfile);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     private void initializeProfiledArgumentTypes(Object[] args) {
         CompilerAsserts.neverPartOfCompilation();
         assert !callProfiled;
@@ -1187,6 +1341,25 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
+    private void initializeProfiledArgumentTypes2(Object arg1, Object arg2) {
+        CompilerAsserts.neverPartOfCompilation();
+        assert !callProfiled;
+        final ArgumentsProfile newProfile;
+        if (engine.argumentTypeSpeculation) {
+            Class<?>[] types = new Class<?>[2];
+            types[0] = classOf(arg1);
+            types[1] = classOf(arg2);
+            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
+        } else {
+            newProfile = ArgumentsProfile.INVALID;
+        }
+
+        if (!updateArgumentsProfile(null, newProfile)) {
+            // Another thread initialized the profile, we need to check it
+            profileArguments2(arg1, arg2);
+        }
+    }
+
     private void updateProfiledArgumentTypes(Object[] args, ArgumentsProfile oldProfile) {
         CompilerAsserts.neverPartOfCompilation();
         assert !callProfiled;
@@ -1200,6 +1373,21 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (!updateArgumentsProfile(oldProfile, newProfile)) {
             // Another thread updated the profile, we need to retry
             profileArguments(args);
+        }
+    }
+
+    private void updateProfiledArgumentTypes2(Object arg1, Object arg2, ArgumentsProfile oldProfile) {
+        CompilerAsserts.neverPartOfCompilation();
+        assert !callProfiled;
+        Class<?>[] oldTypes = oldProfile.types;
+        Class<?>[] newTypes = new Class<?>[2];
+        newTypes[0] = joinTypes(oldTypes[0], classOf(arg1));
+        newTypes[1] = joinTypes(oldTypes[1], classOf(arg2));
+
+        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
+        if (!updateArgumentsProfile(oldProfile, newProfile)) {
+            // Another thread updated the profile, we need to retry
+            profileArguments2(arg1, arg2);
         }
     }
 

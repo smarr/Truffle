@@ -43,9 +43,10 @@ import sun.misc.Unsafe;
  * and therefore is much faster. Should not be used during debugging as potential misuses of the
  * frame object would show up very late and would be hard to identify.
  */
-public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame {
+public final class FrameWithoutBoxing2 implements VirtualFrame, MaterializedFrame {
     private final FrameDescriptor descriptor;
-    private final Object[] arguments;
+    private final Object argument1;
+    private final Object argument2;
     private Object[] locals;
     private long[] primitiveLocals;
     private byte[] tags;
@@ -92,9 +93,10 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
         }
     }
 
-    public FrameWithoutBoxing(FrameDescriptor descriptor, Object[] arguments) {
+    public FrameWithoutBoxing2(FrameDescriptor descriptor, Object arg1, Object arg2) {
         this.descriptor = descriptor;
-        this.arguments = arguments;
+        this.argument1 = arg1;
+        this.argument2 = arg2;
         int size = descriptor.getSize();
         if (size == 0) {
             this.locals = EMPTY_OBJECT_ARRAY;
@@ -113,17 +115,18 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
 
     @Override
     public Object[] getArguments() {
-        return unsafeCast(arguments, Object[].class, true, true, true);
+        throw new UnsupportedOperationException("todo, try to get rid of all these calls");
+        // return unsafeCast(arguments, Object[].class, true, true, true);
     }
 
     @Override
     public Object getArgument1() {
-        return unsafeCast(arguments, Object[].class, true, true, true)[0];
+        return argument1;
     }
 
     @Override
     public Object getArgument2() {
-        return unsafeCast(arguments, Object[].class, true, true, true)[1];
+        return argument2;
     }
 
     @Override

@@ -82,9 +82,49 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
         }
     }
 
+    @Override
+    public Object call2(CallTarget target, Object arg1, Object arg2) {
+        try {
+            OptimizedCallTarget optimizedTarget = ((OptimizedCallTarget) target);
+
+            if (CompilerDirectives.inInterpreter() && !seenInInterpreter) {
+                /*
+                 * No need to deoptimize to modify compilation final state as we only execute this
+                 * in the interpreter.
+                 */
+                this.seenInInterpreter = true;
+            }
+
+            /*
+             * Indirect calls should not cause invalidations if they were compiled prior to
+             * execution. We rather produce a truffle boundary call to the interpreter profile and
+             * escape the arguments.
+             */
+            if (this.seenInInterpreter) {
+                optimizedTarget.stopProfilingArguments();
+            } else {
+                profileIndirectArguments2(optimizedTarget, arg1, arg2);
+            }
+            return optimizedTarget.call2Indirect(this, arg1, arg2);
+        } catch (Throwable t) {
+            if (exceptionProfile == null) {
+                CompilerDirectives.transferToInterpreterAndInvalidate();
+                exceptionProfile = ValueProfile.createClassProfile();
+            }
+            Throwable profiledT = exceptionProfile.profile(t);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
+            throw OptimizedCallTarget.rethrow(profiledT);
+        }
+    }
+
     @TruffleBoundary
     private static void profileIndirectArguments(OptimizedCallTarget optimizedTarget, Object... arguments) {
         optimizedTarget.profileArguments(arguments);
+    }
+
+    @TruffleBoundary
+    private static void profileIndirectArguments2(OptimizedCallTarget optimizedTarget, Object arg1, Object arg2) {
+        optimizedTarget.profileArguments2(arg1, arg2);
     }
 
 }

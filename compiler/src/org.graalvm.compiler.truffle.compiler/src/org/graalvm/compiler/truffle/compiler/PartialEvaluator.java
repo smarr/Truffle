@@ -131,14 +131,19 @@ public abstract class PartialEvaluator {
     private final CanonicalizerPhase canonicalizer;
     private final SnippetReflectionProvider snippetReflection;
     final ResolvedJavaMethod callDirectMethod;
+    final ResolvedJavaMethod call2DirectMethod;
     protected final ResolvedJavaMethod callInlined;
+    protected final ResolvedJavaMethod call2Inlined;
     final ResolvedJavaMethod callIndirectMethod;
+    final ResolvedJavaMethod call2IndirectMethod;
     private final ResolvedJavaMethod profiledPERoot;
+    private final ResolvedJavaMethod profiledPERoot2;
     private final GraphBuilderConfiguration configPrototype;
     private final InvocationPlugins decodingInvocationPlugins;
     private final NodePlugin[] nodePlugins;
     final KnownTruffleTypes knownTruffleTypes;
     final ResolvedJavaMethod callBoundary;
+    final ResolvedJavaMethod callBoundary2;
     private volatile GraphBuilderConfiguration configForParsing;
 
     /**
@@ -170,10 +175,15 @@ public abstract class PartialEvaluator {
         ResolvedJavaType type = runtime.resolveType(metaAccess, "org.graalvm.compiler.truffle.runtime.OptimizedCallTarget");
         ResolvedJavaMethod[] methods = type.getDeclaredMethods();
         this.callDirectMethod = findRequiredMethod(type, methods, "callDirect", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call2DirectMethod = findRequiredMethod(type, methods, "call2Direct", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
         this.callInlined = findRequiredMethod(type, methods, "callInlined", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call2Inlined = findRequiredMethod(type, methods, "call2Inlined", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
         this.callIndirectMethod = findRequiredMethod(type, methods, "callIndirect", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call2IndirectMethod = findRequiredMethod(type, methods, "call2Indirect", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
         this.profiledPERoot = findRequiredMethod(type, methods, "profiledPERoot", "([Ljava/lang/Object;)Ljava/lang/Object;");
+        this.profiledPERoot2 = findRequiredMethod(type, methods, "profiledPERoot2", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
         this.callBoundary = findRequiredMethod(type, methods, "callBoundary", "([Ljava/lang/Object;)Ljava/lang/Object;");
+        this.callBoundary2 = findRequiredMethod(type, methods, "callBoundary2", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 
         this.configPrototype = createGraphBuilderConfig(configForRoot, true);
         this.decodingInvocationPlugins = createDecodingInvocationPlugins(configForRoot.getPlugins());
@@ -273,18 +283,24 @@ public abstract class PartialEvaluator {
     }
 
     public ResolvedJavaMethod[] getCompilationRootMethods() {
-        return new ResolvedJavaMethod[]{profiledPERoot, callInlined, callDirectMethod};
+        return new ResolvedJavaMethod[]{profiledPERoot, profiledPERoot2, callInlined, call2Inlined, callDirectMethod, call2DirectMethod};
     }
 
     public ResolvedJavaMethod[] getNeverInlineMethods() {
-        return new ResolvedJavaMethod[]{callDirectMethod, callIndirectMethod};
+        return new ResolvedJavaMethod[]{callDirectMethod, call2DirectMethod, callIndirectMethod, call2IndirectMethod};
     }
 
-    public ResolvedJavaMethod getCallDirect() {
+    public ResolvedJavaMethod getCallDirect(int numArguments) {
+        if (numArguments == 2) {
+            return call2DirectMethod;
+        }
         return callDirectMethod;
     }
 
-    public ResolvedJavaMethod getCallInlined() {
+    public ResolvedJavaMethod getCallInlined(int numArgs) {
+        if (numArgs == 2) {
+            return call2Inlined;
+        }
         return callInlined;
     }
 
@@ -438,6 +454,9 @@ public abstract class PartialEvaluator {
      * @param compilable the Truffle AST being compiled.
      */
     public ResolvedJavaMethod rootForCallTarget(CompilableTruffleAST compilable) {
+        if (compilable.getNumberOfArguments() == 2) {
+            return profiledPERoot2;
+        }
         return profiledPERoot;
     }
 
@@ -448,6 +467,9 @@ public abstract class PartialEvaluator {
      * @param compilable the Truffle AST being compiled.
      */
     public ResolvedJavaMethod inlineRootForCallTarget(CompilableTruffleAST compilable) {
+        if (compilable.getNumberOfArguments() == 2) {
+            return call2Inlined;
+        }
         return callInlined;
     }
 
@@ -532,7 +554,8 @@ public abstract class PartialEvaluator {
         Providers compilationUnitProviders = providers.copyWith(compilationLocalConstantProvider);
         return new CachingPEGraphDecoder(architecture, request.graph, compilationUnitProviders, newConfig, TruffleCompilerImpl.Optimizations,
                         AllowAssumptions.ifNonNull(request.graph.getAssumptions()),
-                        loopExplosionPlugin, decodingInvocationPlugins, inlineInvokePlugins, parameterPlugin, nodePluginList, callInlined,
+                        loopExplosionPlugin, decodingInvocationPlugins, inlineInvokePlugins, parameterPlugin, nodePluginList,
+                        request.compilable.getNumberOfArguments() == 2 ? call2Inlined : callInlined,
                         sourceLanguagePositionProvider, postParsingPhase, graphCache);
     }
 

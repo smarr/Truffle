@@ -118,6 +118,18 @@ public final class DefaultCallTarget implements RootCallTarget {
         }
     }
 
+    @Override
+    public Object call2(Object arg1, Object arg2) {
+        // Use the encapsulating node as call site and clear it inside as we cross the call boundary
+        EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
+        Node parent = encapsulating.set(null);
+        try {
+            return call2DirectOrIndirect(parent, arg1, arg2);
+        } finally {
+            encapsulating.set(parent);
+        }
+    }
+
     private void initialize() {
         synchronized (this) {
             if (!this.initialized) {

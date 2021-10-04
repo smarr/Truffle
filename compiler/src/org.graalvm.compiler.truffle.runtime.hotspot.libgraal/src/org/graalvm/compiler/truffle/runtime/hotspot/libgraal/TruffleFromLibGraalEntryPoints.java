@@ -46,6 +46,7 @@ import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLi
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCallNodes;
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCallTargetForCallNode;
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCompilableCallCount;
+import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCompilableNumberOfArguments;
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCompilableName;
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetConstantFieldInfo;
 import static org.graalvm.compiler.truffle.common.hotspot.libgraal.TruffleFromLibGraal.Id.GetCurrentCallTarget;
@@ -466,6 +467,11 @@ final class TruffleFromLibGraalEntryPoints {
     @TruffleFromLibGraal(GetCompilableCallCount)
     static int getCompilableCallCount(Object compilableTruffleAST) {
         return ((CompilableTruffleAST) compilableTruffleAST).getCallCount();
+    }
+
+    @TruffleFromLibGraal(GetCompilableNumberOfArguments)
+    static int getCompilableNumberOfArguments(Object compilableTruffleAST) {
+        return ((CompilableTruffleAST) compilableTruffleAST).getNumberOfArguments();
     }
 
     @TruffleFromLibGraal(GetCallNodes)

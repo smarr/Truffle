@@ -93,6 +93,8 @@ public interface CompilableTruffleAST {
      */
     int getCallCount();
 
+    int getNumberOfArguments();
+
     /**
      * Cancel the compilation of this truffle ast.
      */

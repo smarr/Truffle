@@ -863,6 +863,11 @@ public class InstrumentationTest extends AbstractInstrumentationTest {
                 public Object call(Object... arguments) {
                     return TestOtherLanguageParseInline.this;
                 }
+
+                @Override
+                public Object call2(Object arg1, Object arg2) {
+                    return TestOtherLanguageParseInline.this;
+                }
             };
         }
 

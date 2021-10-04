@@ -77,7 +77,7 @@ final class GraphManager {
                         rootRequest.options,
                         rootRequest.debug,
                         truffleAST,
-                        finalize ? partialEvaluator.getCallDirect() : partialEvaluator.inlineRootForCallTarget(truffleAST),
+                        finalize ? partialEvaluator.getCallDirect(truffleAST.getNumberOfArguments()) : partialEvaluator.inlineRootForCallTarget(truffleAST),
                         rootRequest.inliningPlan,
                         rootRequest.compilationId,
                         rootRequest.log,
@@ -107,7 +107,7 @@ final class GraphManager {
                 return PartialEvaluator.asInlineInfo(method);
             }
         }, graphCacheForInlining);
-        InliningUtil.inline(invoke, request.graph, true, partialEvaluator.getCallInlined(), "finalization", AgnosticInliningPhase.class.getName());
+        InliningUtil.inline(invoke, request.graph, true, partialEvaluator.getCallInlined(truffleAST.getNumberOfArguments()), "finalization", AgnosticInliningPhase.class.getName());
     }
 
     static class Entry {

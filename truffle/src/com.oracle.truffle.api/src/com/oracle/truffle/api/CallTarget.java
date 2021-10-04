@@ -61,4 +61,6 @@ public interface CallTarget {
      * @since 0.8 or earlier
      */
     Object call(Object... arguments);
+
+    Object call2(Object arg1, Object arg2);
 }

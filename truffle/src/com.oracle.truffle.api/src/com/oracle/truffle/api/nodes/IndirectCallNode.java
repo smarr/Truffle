@@ -74,6 +74,8 @@ public abstract class IndirectCallNode extends Node {
      */
     public abstract Object call(CallTarget target, Object... arguments);
 
+    public abstract Object call2(CallTarget target, Object arg1, Object arg2);
+
     /** @since 0.8 or earlier */
     public static IndirectCallNode create() {
         return Truffle.getRuntime().createIndirectCallNode();
@@ -89,6 +91,12 @@ public abstract class IndirectCallNode extends Node {
         @TruffleBoundary
         public Object call(CallTarget target, Object... arguments) {
             return target.call(arguments);
+        }
+
+        @Override
+        @TruffleBoundary
+        public Object call2(CallTarget target, Object arg1, Object arg2) {
+            return target.call2(arg1, arg2);
         }
     };
 

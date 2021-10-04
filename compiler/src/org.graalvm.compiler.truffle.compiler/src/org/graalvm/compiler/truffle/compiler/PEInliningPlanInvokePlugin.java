@@ -73,7 +73,7 @@ final class PEInliningPlanInvokePlugin implements InlineInvokePlugin {
         }
         assert !builder.parsingIntrinsic();
 
-        if (original.equals(partialEvaluator.callDirectMethod)) {
+        if (original.equals(partialEvaluator.callDirectMethod) || original.equals(partialEvaluator.call2DirectMethod)) {
             ValueNode arg0 = arguments[1];
             if (!arg0.isConstant()) {
                 GraalError.shouldNotReachHere("The direct call node does not resolve to a constant!");
@@ -87,6 +87,9 @@ final class PEInliningPlanInvokePlugin implements InlineInvokePlugin {
                 inlining.push(decision);
                 JavaConstant assumption = decision.getNodeRewritingAssumption();
                 builder.getAssumptions().record(new TruffleAssumption(assumption));
+                if (arguments.length == 2) {
+                    return createStandardInlineInfo(partialEvaluator.call2Inlined);
+                }
                 return createStandardInlineInfo(partialEvaluator.callInlined);
             }
         }
@@ -121,7 +124,7 @@ final class PEInliningPlanInvokePlugin implements InlineInvokePlugin {
 
     @Override
     public void notifyAfterInline(ResolvedJavaMethod inlinedTargetMethod) {
-        if (inlinedTargetMethod.equals(partialEvaluator.callInlined)) {
+        if (inlinedTargetMethod.equals(partialEvaluator.callInlined) || inlinedTargetMethod.equals(partialEvaluator.call2Inlined)) {
             inlining.pop();
         }
     }
