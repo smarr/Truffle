@@ -162,6 +162,24 @@ public class SubstrateOptimizedCallTarget extends OptimizedCallTarget implements
     }
 
     @Override
+    public Object doInvoke2(Object arg1, Object arg2) {
+        /*
+         * We have to be very careful that the calling code is uninterruptible, i.e., has no
+         * safepoint between the read of the compiled code address and the indirect call to this
+         * address. Otherwise, the code can be invalidated concurrently and we invoke an address
+         * that no longer contains executable code.
+         */
+        long start = address;
+        // The call below is not a safepoint as it is intrinsified in TruffleGraphBuilderPlugins.
+        if (start != 0) {
+            CallBoundaryFunctionPointer target = WordFactory.pointer(start);
+            return KnownIntrinsics.convertUnknownValue(target.invoke2(this, arg1, arg2), Object.class);
+        } else {
+            return callBoundary2(arg1, arg2);
+        }
+    }
+
+    @Override
     public boolean cancelCompilation(CharSequence reason) {
         if (SubstrateTruffleOptions.isMultiThreaded()) {
             return super.cancelCompilation(reason);
@@ -177,5 +195,8 @@ public class SubstrateOptimizedCallTarget extends OptimizedCallTarget implements
     interface CallBoundaryFunctionPointer extends CFunctionPointer {
         @InvokeJavaFunctionPointer
         Object invoke(OptimizedCallTarget receiver, Object[] args);
+
+        @InvokeJavaFunctionPointer
+        Object invoke2(OptimizedCallTarget receiver, Object arg1, Object arg2);
     }
 }

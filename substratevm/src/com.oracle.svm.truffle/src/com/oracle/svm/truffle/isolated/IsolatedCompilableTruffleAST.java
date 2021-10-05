@@ -103,6 +103,11 @@ final class IsolatedCompilableTruffleAST extends IsolatedObjectProxy<SubstrateCo
     }
 
     @Override
+    public int getNumberOfArguments() {
+        return getNumberOfArguments0(IsolatedCompileContext.get().getClient(), handle);
+    }
+
+    @Override
     public int getCallCount() {
         return getCallCount0(IsolatedCompileContext.get().getClient(), handle);
     }
@@ -221,6 +226,13 @@ final class IsolatedCompilableTruffleAST extends IsolatedObjectProxy<SubstrateCo
             nodes[i] = new IsolatedTruffleCallNode(handle);
         }
         return IsolatedCompileContext.get().hand(nodes);
+    }
+
+    @CEntryPoint
+    @CEntryPointOptions(include = CEntryPointOptions.NotIncludedAutomatically.class, publishAs = CEntryPointOptions.Publish.NotPublished)
+    private static int getNumberOfArguments0(@SuppressWarnings("unused") ClientIsolateThread client, ClientHandle<SubstrateCompilableTruffleAST> compilableHandle) {
+        SubstrateCompilableTruffleAST compilable = IsolatedCompileClient.get().unhand(compilableHandle);
+        return compilable.getNumberOfArguments();
     }
 
     @CEntryPoint
