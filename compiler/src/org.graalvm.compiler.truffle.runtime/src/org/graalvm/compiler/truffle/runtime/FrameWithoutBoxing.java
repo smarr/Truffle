@@ -45,7 +45,8 @@ import sun.misc.Unsafe;
  */
 public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame {
     private final FrameDescriptor descriptor;
-    private final Object[] arguments;
+    private final Object arg1OrArguments;
+    private final Object arg2;
     private Object[] locals;
     private long[] primitiveLocals;
     private byte[] tags;
@@ -94,7 +95,31 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
 
     public FrameWithoutBoxing(FrameDescriptor descriptor, Object[] arguments) {
         this.descriptor = descriptor;
-        this.arguments = arguments;
+        this.arg1OrArguments = arguments;
+        this.arg2 = null;
+        assert arguments.length != 2 : "we expect the other constructor to be used";
+        int size = descriptor.getSize();
+        if (size == 0) {
+            this.locals = EMPTY_OBJECT_ARRAY;
+            this.primitiveLocals = EMPTY_LONG_ARRAY;
+            this.tags = EMPTY_BYTE_ARRAY;
+        } else {
+            this.locals = new Object[size];
+            Object defaultValue = descriptor.getDefaultValue();
+            if (defaultValue != null) {
+                Arrays.fill(locals, defaultValue);
+            }
+            this.primitiveLocals = new long[size];
+            this.tags = new byte[size];
+        }
+    }
+
+    public FrameWithoutBoxing(FrameDescriptor descriptor, Object arg1, Object arg2) {
+        this.descriptor = descriptor;
+        this.arg1OrArguments = arg1;
+        this.arg2 = arg2;
+        assert arg2 != null;
+
         int size = descriptor.getSize();
         if (size == 0) {
             this.locals = EMPTY_OBJECT_ARRAY;
@@ -113,17 +138,26 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
 
     @Override
     public Object[] getArguments() {
-        return unsafeCast(arguments, Object[].class, true, true, true);
+        return unsafeCast(arg1OrArguments, Object[].class, true, true, true);
     }
 
     @Override
     public Object getArgument1() {
-        return unsafeCast(arguments, Object[].class, true, true, true)[0];
+        if (arg2 == null) {
+            return unsafeCast(arg1OrArguments, Object[].class, true, true, true)[0];
+        } else {
+            return arg1OrArguments;
+        }
+
     }
 
     @Override
     public Object getArgument2() {
-        return unsafeCast(arguments, Object[].class, true, true, true)[1];
+        if (arg2 == null) {
+            return unsafeCast(arg1OrArguments, Object[].class, true, true, true)[1];
+        } else {
+            return arg2;
+        }
     }
 
     @Override

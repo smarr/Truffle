@@ -94,7 +94,7 @@ public final class DefaultCallTarget implements RootCallTarget {
         if (!this.initialized) {
             initialize();
         }
-        final DefaultArg2VirtualFrame frame = new DefaultArg2VirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2);
+        final DefaultVirtualFrame frame = new DefaultVirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2);
         DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
         try {
             return rootNode.execute(frame);

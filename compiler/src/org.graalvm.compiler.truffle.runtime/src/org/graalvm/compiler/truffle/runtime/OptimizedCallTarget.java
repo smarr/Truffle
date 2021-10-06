@@ -1052,7 +1052,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     }
 
     public static VirtualFrame createFrame(FrameDescriptor descriptor, Object arg1, Object arg2) {
-        return new FrameWithoutBoxing2(descriptor, arg1, arg2);
+        return new FrameWithoutBoxing(descriptor, arg1, arg2);
     }
 
     final void onLoopCount(int count) {

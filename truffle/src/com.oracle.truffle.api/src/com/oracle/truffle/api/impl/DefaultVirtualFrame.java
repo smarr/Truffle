@@ -58,13 +58,32 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 final class DefaultVirtualFrame implements VirtualFrame {
 
     private final FrameDescriptor descriptor;
-    private final Object[] arguments;
+    private final Object arg1OrArguments;
+    private final Object arg2;
     private Object[] locals;
     private byte[] tags;
 
     DefaultVirtualFrame(FrameDescriptor descriptor, Object[] arguments) {
         this.descriptor = descriptor;
-        this.arguments = arguments;
+        assert arguments.length != 2 : "We expect the other constructor to be used";
+        this.arg1OrArguments = arguments;
+        this.arg2 = null;
+        // read size only once
+        final int size = descriptor.getSize();
+        this.locals = new Object[size];
+        Object defaultValue = descriptor.getDefaultValue();
+        if (defaultValue != null) {
+            Arrays.fill(locals, defaultValue);
+        }
+        this.tags = new byte[size];
+    }
+
+    DefaultVirtualFrame(FrameDescriptor descriptor, Object arg1, Object arg2) {
+        this.descriptor = descriptor;
+        this.arg1OrArguments = arg1;
+        this.arg2 = arg2;
+        assert arg2 != null;
+
         // read size only once
         final int size = descriptor.getSize();
         this.locals = new Object[size];
@@ -77,15 +96,24 @@ final class DefaultVirtualFrame implements VirtualFrame {
 
     @Override
     public Object[] getArguments() {
-        return arguments;
+        return (Object[]) arg1OrArguments;
     }
 
     public Object getArgument1() {
-        return arguments[0];
+        if (arg2 == null) {
+            return ((Object[]) arg1OrArguments)[0];
+        } else {
+            return arg1OrArguments;
+        }
+
     }
 
     public Object getArgument2() {
-        return arguments[1];
+        if (arg2 == null) {
+            return ((Object[]) arg1OrArguments)[1];
+        } else {
+            return arg2;
+        }
     }
 
     @Override
