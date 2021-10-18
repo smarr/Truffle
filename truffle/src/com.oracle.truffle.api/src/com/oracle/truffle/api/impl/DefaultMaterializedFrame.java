@@ -65,12 +65,54 @@ final class DefaultMaterializedFrame implements MaterializedFrame {
         return wrapped.getArguments();
     }
 
+    @Override
+    public Object getArgument(int idx) {
+        return wrapped.getArgument(idx);
+    }
+
+    @Override
+    public void setArgument(int idx, Object val) {
+        wrapped.setArgument(idx, val);
+    }
+
+    @Override
     public Object getArgument1() {
         return wrapped.getArgument1();
     }
 
+    @Override
+    public void setArgument1(Object val) {
+        wrapped.setArgument1(val);
+    }
+
+    @Override
     public Object getArgument2() {
         return wrapped.getArgument2();
+    }
+
+    @Override
+    public void setArgument2(Object val) {
+        wrapped.setArgument2(val);
+    }
+
+    @Override
+    public Object getArgument3() {
+        return wrapped.getArgument3();
+    }
+
+    @Override
+    public void setArgument3(Object val) {
+        wrapped.setArgument3(val);
+    }
+
+    @Override
+    public Object getArgument4() {
+        return wrapped.getArgument4();
+    }
+
+    @Override
+    public void setArgument4(Object val) {
+        wrapped.setArgument4(val);
     }
 
     @Override

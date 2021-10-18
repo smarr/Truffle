@@ -58,16 +58,40 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 final class DefaultVirtualFrame implements VirtualFrame {
 
     private final FrameDescriptor descriptor;
-    private final Object arg1OrArguments;
-    private final Object arg2;
+    private Object arg1;
+    private Object arg2;
+    private Object arg3;
+    private Object arg4;
+    private final Object[] remainingArgs;
+
     private Object[] locals;
     private byte[] tags;
 
     DefaultVirtualFrame(FrameDescriptor descriptor, Object[] arguments) {
         this.descriptor = descriptor;
-        assert arguments.length != 2 : "We expect the other constructor to be used";
-        this.arg1OrArguments = arguments;
-        this.arg2 = null;
+        assert arguments.length == 0 || arguments.length > 4 : "We expect the other constructors to be used";
+        if (arguments.length > 0) {
+            this.arg1 = arguments[0];
+            this.arg2 = arguments[1];
+            this.arg3 = arguments[2];
+            this.arg4 = arguments[3];
+        }
+        this.remainingArgs = arguments;
+        // read size only once
+        final int size = descriptor.getSize();
+        this.locals = new Object[size];
+        Object defaultValue = descriptor.getDefaultValue();
+        if (defaultValue != null) {
+            Arrays.fill(locals, defaultValue);
+        }
+        this.tags = new byte[size];
+    }
+
+    DefaultVirtualFrame(FrameDescriptor descriptor, Object arg1) {
+        this.descriptor = descriptor;
+        this.arg1 = arg1;
+        this.remainingArgs = null;
+
         // read size only once
         final int size = descriptor.getSize();
         this.locals = new Object[size];
@@ -80,9 +104,44 @@ final class DefaultVirtualFrame implements VirtualFrame {
 
     DefaultVirtualFrame(FrameDescriptor descriptor, Object arg1, Object arg2) {
         this.descriptor = descriptor;
-        this.arg1OrArguments = arg1;
+        this.arg1 = arg1;
         this.arg2 = arg2;
-        assert arg2 != null;
+        this.remainingArgs = null;
+
+        // read size only once
+        final int size = descriptor.getSize();
+        this.locals = new Object[size];
+        Object defaultValue = descriptor.getDefaultValue();
+        if (defaultValue != null) {
+            Arrays.fill(locals, defaultValue);
+        }
+        this.tags = new byte[size];
+    }
+
+    DefaultVirtualFrame(FrameDescriptor descriptor, Object arg1, Object arg2, Object arg3) {
+        this.descriptor = descriptor;
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.arg3 = arg3;
+        this.remainingArgs = null;
+
+        // read size only once
+        final int size = descriptor.getSize();
+        this.locals = new Object[size];
+        Object defaultValue = descriptor.getDefaultValue();
+        if (defaultValue != null) {
+            Arrays.fill(locals, defaultValue);
+        }
+        this.tags = new byte[size];
+    }
+
+    DefaultVirtualFrame(FrameDescriptor descriptor, Object arg1, Object arg2, Object arg3, Object arg4) {
+        this.descriptor = descriptor;
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.arg3 = arg3;
+        this.arg4 = arg4;
+        this.remainingArgs = null;
 
         // read size only once
         final int size = descriptor.getSize();
@@ -96,24 +155,79 @@ final class DefaultVirtualFrame implements VirtualFrame {
 
     @Override
     public Object[] getArguments() {
-        return (Object[]) arg1OrArguments;
+        return remainingArgs;
     }
 
-    public Object getArgument1() {
-        if (arg2 == null) {
-            return ((Object[]) arg1OrArguments)[0];
-        } else {
-            return arg1OrArguments;
+    @Override
+    public Object getArgument(int idx) {
+        if (idx == 0) {
+            return arg1;
         }
-
-    }
-
-    public Object getArgument2() {
-        if (arg2 == null) {
-            return ((Object[]) arg1OrArguments)[1];
-        } else {
+        if (idx == 1) {
             return arg2;
         }
+        if (idx == 2) {
+            return arg3;
+        }
+        if (idx == 3) {
+            return arg4;
+        }
+        return remainingArgs[idx];
+    }
+
+    @Override
+    public void setArgument(int idx, Object val) {
+        if (idx == 0) {
+            arg1 = val;
+        } else if (idx == 1) {
+            arg2 = val;
+        } else if (idx == 2) {
+            arg3 = val;
+        } else if (idx == 3) {
+            arg4 = val;
+        } else {
+            remainingArgs[idx] = val;
+        }
+    }
+
+    @Override
+    public Object getArgument1() {
+        return arg1;
+    }
+
+    @Override
+    public void setArgument1(Object val) {
+        arg1 = val;
+    }
+
+    @Override
+    public Object getArgument2() {
+        return arg2;
+    }
+
+    @Override
+    public void setArgument2(Object val) {
+        arg2 = val;
+    }
+
+    @Override
+    public Object getArgument3() {
+        return arg3;
+    }
+
+    @Override
+    public void setArgument3(Object val) {
+        arg3 = val;
+    }
+
+    @Override
+    public Object getArgument4() {
+        return arg4;
+    }
+
+    @Override
+    public void setArgument4(Object val) {
+        arg4 = val;
     }
 
     @Override

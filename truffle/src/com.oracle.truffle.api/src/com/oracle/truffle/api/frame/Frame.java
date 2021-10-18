@@ -63,9 +63,25 @@ public interface Frame {
      */
     Object[] getArguments();
 
+    Object getArgument(int idx);
+
+    void setArgument(int idx, Object val);
+
     Object getArgument1();
 
+    void setArgument1(Object val);
+
     Object getArgument2();
+
+    void setArgument2(Object val);
+
+    Object getArgument3();
+
+    void setArgument3(Object val);
+
+    Object getArgument4();
+
+    void setArgument4(Object val);
 
     /**
      * Read access to a local variable of type {@link Object}.

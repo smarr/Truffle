@@ -66,12 +66,64 @@ class ReadOnlyFrame implements Frame {
         return delegate.getArguments().clone();
     }
 
+    @Override
+    @TruffleBoundary
+    public Object getArgument(int idx) {
+        return delegate.getArgument(idx);
+    }
+
+    @Override
+    @TruffleBoundary
+    public void setArgument(int idx, Object val) {
+        delegate.setArgument(idx, val);
+    }
+
+    @Override
+    @TruffleBoundary
     public Object getArgument1() {
         return delegate.getArgument1();
     }
 
+    @Override
+    @TruffleBoundary
+    public void setArgument1(Object val) {
+        delegate.setArgument1(val);
+    }
+
+    @Override
+    @TruffleBoundary
     public Object getArgument2() {
         return delegate.getArgument2();
+    }
+
+    @Override
+    @TruffleBoundary
+    public void setArgument2(Object val) {
+        delegate.setArgument2(val);
+    }
+
+    @Override
+    @TruffleBoundary
+    public Object getArgument3() {
+        return delegate.getArgument3();
+    }
+
+    @Override
+    @TruffleBoundary
+    public void setArgument3(Object val) {
+        delegate.setArgument3(val);
+    }
+
+    @Override
+    @TruffleBoundary
+    public Object getArgument4() {
+        return delegate.getArgument4();
+    }
+
+    @Override
+    @TruffleBoundary
+    public void setArgument4(Object val) {
+        delegate.setArgument4(val);
     }
 
     @Override
