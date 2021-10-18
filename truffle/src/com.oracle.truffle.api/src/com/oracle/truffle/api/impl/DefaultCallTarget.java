@@ -90,11 +90,59 @@ public final class DefaultCallTarget implements RootCallTarget {
         }
     }
 
+    Object call1DirectOrIndirect(final Node callNode, Object arg1) {
+        if (!this.initialized) {
+            initialize();
+        }
+        final DefaultVirtualFrame frame = new DefaultVirtualFrame(rootNode.getFrameDescriptor(), arg1);
+        DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
+        try {
+            return rootNode.execute(frame);
+        } catch (Throwable t) {
+            DefaultRuntimeAccessor.LANGUAGE.onThrowable(callNode, this, t, frame);
+            throw t;
+        } finally {
+            getRuntime().popFrame(callerFrame);
+        }
+    }
+
     Object call2DirectOrIndirect(final Node callNode, Object arg1, Object arg2) {
         if (!this.initialized) {
             initialize();
         }
         final DefaultVirtualFrame frame = new DefaultVirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2);
+        DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
+        try {
+            return rootNode.execute(frame);
+        } catch (Throwable t) {
+            DefaultRuntimeAccessor.LANGUAGE.onThrowable(callNode, this, t, frame);
+            throw t;
+        } finally {
+            getRuntime().popFrame(callerFrame);
+        }
+    }
+
+    Object call3DirectOrIndirect(final Node callNode, Object arg1, Object arg2, Object arg3) {
+        if (!this.initialized) {
+            initialize();
+        }
+        final DefaultVirtualFrame frame = new DefaultVirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2, arg3);
+        DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
+        try {
+            return rootNode.execute(frame);
+        } catch (Throwable t) {
+            DefaultRuntimeAccessor.LANGUAGE.onThrowable(callNode, this, t, frame);
+            throw t;
+        } finally {
+            getRuntime().popFrame(callerFrame);
+        }
+    }
+
+    Object call4DirectOrIndirect(final Node callNode, Object arg1, Object arg2, Object arg3, Object arg4) {
+        if (!this.initialized) {
+            initialize();
+        }
+        final DefaultVirtualFrame frame = new DefaultVirtualFrame(rootNode.getFrameDescriptor(), arg1, arg2, arg3, arg4);
         DefaultFrameInstance callerFrame = getRuntime().pushFrame(frame, this, callNode);
         try {
             return rootNode.execute(frame);
@@ -119,12 +167,48 @@ public final class DefaultCallTarget implements RootCallTarget {
     }
 
     @Override
+    public Object call1(Object arg1) {
+        // Use the encapsulating node as call site and clear it inside as we cross the call boundary
+        EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
+        Node parent = encapsulating.set(null);
+        try {
+            return call1DirectOrIndirect(parent, arg1);
+        } finally {
+            encapsulating.set(parent);
+        }
+    }
+
+    @Override
     public Object call2(Object arg1, Object arg2) {
         // Use the encapsulating node as call site and clear it inside as we cross the call boundary
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node parent = encapsulating.set(null);
         try {
             return call2DirectOrIndirect(parent, arg1, arg2);
+        } finally {
+            encapsulating.set(parent);
+        }
+    }
+
+    @Override
+    public Object call3(Object arg1, Object arg2, Object arg3) {
+        // Use the encapsulating node as call site and clear it inside as we cross the call boundary
+        EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
+        Node parent = encapsulating.set(null);
+        try {
+            return call3DirectOrIndirect(parent, arg1, arg2, arg3);
+        } finally {
+            encapsulating.set(parent);
+        }
+    }
+
+    @Override
+    public Object call4(Object arg1, Object arg2, Object arg3, Object arg4) {
+        // Use the encapsulating node as call site and clear it inside as we cross the call boundary
+        EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
+        Node parent = encapsulating.set(null);
+        try {
+            return call4DirectOrIndirect(parent, arg1, arg2, arg3, arg4);
         } finally {
             encapsulating.set(parent);
         }

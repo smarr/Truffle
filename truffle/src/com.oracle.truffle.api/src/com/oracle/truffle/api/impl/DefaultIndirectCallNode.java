@@ -54,8 +54,22 @@ final class DefaultIndirectCallNode extends IndirectCallNode {
     }
 
     @Override
+    public Object call1(CallTarget target, Object arg1) {
+        return ((DefaultCallTarget) target).call1DirectOrIndirect(this, arg1);
+    }
+
+    @Override
     public Object call2(CallTarget target, Object arg1, Object arg2) {
         return ((DefaultCallTarget) target).call2DirectOrIndirect(this, arg1, arg2);
     }
 
+    @Override
+    public Object call3(CallTarget target, Object arg1, Object arg2, Object arg3) {
+        return ((DefaultCallTarget) target).call3DirectOrIndirect(this, arg1, arg2, arg3);
+    }
+
+    @Override
+    public Object call4(CallTarget target, Object arg1, Object arg2, Object arg3, Object arg4) {
+        return ((DefaultCallTarget) target).call4DirectOrIndirect(this, arg1, arg2, arg3, arg4);
+    }
 }

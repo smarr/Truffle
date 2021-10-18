@@ -77,6 +77,24 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
     }
 
     @Override
+    public Object call1(Object arg1) {
+        OptimizedCallTarget target = getCurrentCallTarget();
+        if (CompilerDirectives.inInterpreter()) {
+            target = onInterpreterCall(target);
+        }
+        if (GraalCompilerDirectives.inFirstTier()) {
+            incrementCallCount();
+        }
+        try {
+            return target.call1Direct(this, arg1);
+        } catch (Throwable t) {
+            Throwable profiledT = profileExceptionType(t);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
+            throw OptimizedCallTarget.rethrow(profiledT);
+        }
+    }
+
+    @Override
     public Object call2(Object arg1, Object arg2) {
         OptimizedCallTarget target = getCurrentCallTarget();
         if (CompilerDirectives.inInterpreter()) {
@@ -87,6 +105,42 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
         }
         try {
             return target.call2Direct(this, arg1, arg2);
+        } catch (Throwable t) {
+            Throwable profiledT = profileExceptionType(t);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
+            throw OptimizedCallTarget.rethrow(profiledT);
+        }
+    }
+
+    @Override
+    public Object call3(Object arg1, Object arg2, Object arg3) {
+        OptimizedCallTarget target = getCurrentCallTarget();
+        if (CompilerDirectives.inInterpreter()) {
+            target = onInterpreterCall(target);
+        }
+        if (GraalCompilerDirectives.inFirstTier()) {
+            incrementCallCount();
+        }
+        try {
+            return target.call3Direct(this, arg1, arg2, arg3);
+        } catch (Throwable t) {
+            Throwable profiledT = profileExceptionType(t);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
+            throw OptimizedCallTarget.rethrow(profiledT);
+        }
+    }
+
+    @Override
+    public Object call4(Object arg1, Object arg2, Object arg3, Object arg4) {
+        OptimizedCallTarget target = getCurrentCallTarget();
+        if (CompilerDirectives.inInterpreter()) {
+            target = onInterpreterCall(target);
+        }
+        if (GraalCompilerDirectives.inFirstTier()) {
+            incrementCallCount();
+        }
+        try {
+            return target.call4Direct(this, arg1, arg2, arg3, arg4);
         } catch (Throwable t) {
             Throwable profiledT = profileExceptionType(t);
             GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);

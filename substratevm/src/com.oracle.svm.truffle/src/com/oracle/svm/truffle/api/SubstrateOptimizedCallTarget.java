@@ -162,6 +162,24 @@ public class SubstrateOptimizedCallTarget extends OptimizedCallTarget implements
     }
 
     @Override
+    public Object doInvoke1(Object arg1) {
+        /*
+         * We have to be very careful that the calling code is uninterruptible, i.e., has no
+         * safepoint between the read of the compiled code address and the indirect call to this
+         * address. Otherwise, the code can be invalidated concurrently and we invoke an address
+         * that no longer contains executable code.
+         */
+        long start = address;
+        // The call below is not a safepoint as it is intrinsified in TruffleGraphBuilderPlugins.
+        if (start != 0) {
+            CallBoundaryFunctionPointer target = WordFactory.pointer(start);
+            return KnownIntrinsics.convertUnknownValue(target.invoke1(this, arg1), Object.class);
+        } else {
+            return callBoundary1(arg1);
+        }
+    }
+
+    @Override
     public Object doInvoke2(Object arg1, Object arg2) {
         /*
          * We have to be very careful that the calling code is uninterruptible, i.e., has no
@@ -176,6 +194,42 @@ public class SubstrateOptimizedCallTarget extends OptimizedCallTarget implements
             return KnownIntrinsics.convertUnknownValue(target.invoke2(this, arg1, arg2), Object.class);
         } else {
             return callBoundary2(arg1, arg2);
+        }
+    }
+
+    @Override
+    public Object doInvoke3(Object arg1, Object arg2, Object arg3) {
+        /*
+         * We have to be very careful that the calling code is uninterruptible, i.e., has no
+         * safepoint between the read of the compiled code address and the indirect call to this
+         * address. Otherwise, the code can be invalidated concurrently and we invoke an address
+         * that no longer contains executable code.
+         */
+        long start = address;
+        // The call below is not a safepoint as it is intrinsified in TruffleGraphBuilderPlugins.
+        if (start != 0) {
+            CallBoundaryFunctionPointer target = WordFactory.pointer(start);
+            return KnownIntrinsics.convertUnknownValue(target.invoke3(this, arg1, arg2, arg3), Object.class);
+        } else {
+            return callBoundary3(arg1, arg2, arg3);
+        }
+    }
+
+    @Override
+    public Object doInvoke4(Object arg1, Object arg2, Object arg3, Object arg4) {
+        /*
+         * We have to be very careful that the calling code is uninterruptible, i.e., has no
+         * safepoint between the read of the compiled code address and the indirect call to this
+         * address. Otherwise, the code can be invalidated concurrently and we invoke an address
+         * that no longer contains executable code.
+         */
+        long start = address;
+        // The call below is not a safepoint as it is intrinsified in TruffleGraphBuilderPlugins.
+        if (start != 0) {
+            CallBoundaryFunctionPointer target = WordFactory.pointer(start);
+            return KnownIntrinsics.convertUnknownValue(target.invoke4(this, arg1, arg2, arg3, arg4), Object.class);
+        } else {
+            return callBoundary4(arg1, arg2, arg3, arg4);
         }
     }
 
@@ -197,6 +251,15 @@ public class SubstrateOptimizedCallTarget extends OptimizedCallTarget implements
         Object invoke(OptimizedCallTarget receiver, Object[] args);
 
         @InvokeJavaFunctionPointer
+        Object invoke1(OptimizedCallTarget receiver, Object arg1);
+
+        @InvokeJavaFunctionPointer
         Object invoke2(OptimizedCallTarget receiver, Object arg1, Object arg2);
+
+        @InvokeJavaFunctionPointer
+        Object invoke3(OptimizedCallTarget receiver, Object arg1, Object arg2, Object arg3);
+
+        @InvokeJavaFunctionPointer
+        Object invoke4(OptimizedCallTarget receiver, Object arg1, Object arg2, Object arg3, Object arg4);
     }
 }

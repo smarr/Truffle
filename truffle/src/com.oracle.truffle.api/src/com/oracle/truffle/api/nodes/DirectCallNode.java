@@ -82,7 +82,13 @@ public abstract class DirectCallNode extends Node {
      */
     public abstract Object call(Object... arguments);
 
+    public abstract Object call1(Object arg1);
+
     public abstract Object call2(Object arg1, Object arg2);
+
+    public abstract Object call3(Object arg1, Object arg2, Object arg3);
+
+    public abstract Object call4(Object arg1, Object arg2, Object arg3, Object arg4);
 
     /**
      * Returns the originally supplied {@link CallTarget} when this call node was created. Please

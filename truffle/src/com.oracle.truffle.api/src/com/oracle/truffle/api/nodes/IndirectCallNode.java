@@ -74,7 +74,13 @@ public abstract class IndirectCallNode extends Node {
      */
     public abstract Object call(CallTarget target, Object... arguments);
 
+    public abstract Object call1(CallTarget target, Object arg1);
+
     public abstract Object call2(CallTarget target, Object arg1, Object arg2);
+
+    public abstract Object call3(CallTarget target, Object arg1, Object arg2, Object arg3);
+
+    public abstract Object call4(CallTarget target, Object arg1, Object arg2, Object arg3, Object arg4);
 
     /** @since 0.8 or earlier */
     public static IndirectCallNode create() {
@@ -95,8 +101,26 @@ public abstract class IndirectCallNode extends Node {
 
         @Override
         @TruffleBoundary
+        public Object call1(CallTarget target, Object arg1) {
+            return target.call1(arg1);
+        }
+
+        @Override
+        @TruffleBoundary
         public Object call2(CallTarget target, Object arg1, Object arg2) {
             return target.call2(arg1, arg2);
+        }
+
+        @Override
+        @TruffleBoundary
+        public Object call3(CallTarget target, Object arg1, Object arg2, Object arg3) {
+            return target.call3(arg1, arg2, arg3);
+        }
+
+        @Override
+        @TruffleBoundary
+        public Object call4(CallTarget target, Object arg1, Object arg2, Object arg3, Object arg4) {
+            return target.call4(arg1, arg2, arg3, arg4);
         }
     };
 

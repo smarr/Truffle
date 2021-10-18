@@ -62,5 +62,11 @@ public interface CallTarget {
      */
     Object call(Object... arguments);
 
+    Object call1(Object arg1);
+
     Object call2(Object arg1, Object arg2);
+
+    Object call3(Object arg1, Object arg2, Object arg3);
+
+    Object call4(Object arg1, Object arg2, Object arg3, Object arg4);
 }
