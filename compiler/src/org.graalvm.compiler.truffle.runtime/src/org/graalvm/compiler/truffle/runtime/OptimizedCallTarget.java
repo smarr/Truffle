@@ -652,10 +652,40 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
+    public final Object call1Inlined(Node location, Object arg1) {
+        try {
+            ensureInitialized();
+            return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), arg1));
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
     public final Object call2Inlined(Node location, Object arg1, Object arg2) {
         try {
             ensureInitialized();
             return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), arg1, arg2));
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
+    public final Object call3Inlined(Node location, Object arg1, Object arg2, Object arg3) {
+        try {
+            ensureInitialized();
+            return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), arg1, arg2, arg3));
+        } finally {
+            // this assertion is needed to keep the values from being cleared as non-live locals
+            assert keepAlive(location);
+        }
+    }
+
+    public final Object call4Inlined(Node location, Object arg1, Object arg2, Object arg3, Object arg4) {
+        try {
+            ensureInitialized();
+            return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), arg1, arg2, arg3, arg4));
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -923,7 +953,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             }
         }
 
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2));
+        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3, originalArg4));
 
         profileReturnValue(result);
         return result;

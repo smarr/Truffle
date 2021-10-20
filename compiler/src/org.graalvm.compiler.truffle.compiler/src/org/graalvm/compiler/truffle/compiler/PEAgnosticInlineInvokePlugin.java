@@ -55,7 +55,8 @@ public final class PEAgnosticInlineInvokePlugin implements InlineInvokePlugin {
     @Override
     public InlineInfo shouldInlineInvoke(GraphBuilderContext builder, ResolvedJavaMethod original, ValueNode[] arguments) {
         InlineInfo inlineInfo = PartialEvaluator.asInlineInfo(original);
-        if (original.equals(partialEvaluator.callDirectMethod) || original.equals(partialEvaluator.call2DirectMethod)) {
+        if (original.equals(partialEvaluator.callDirectMethod) || original.equals(partialEvaluator.call1DirectMethod) || original.equals(partialEvaluator.call2DirectMethod) ||
+                        original.equals(partialEvaluator.call3DirectMethod) || original.equals(partialEvaluator.call4DirectMethod)) {
             ValueNode arg0 = arguments[1];
             if (!arg0.isConstant()) {
                 GraalError.shouldNotReachHere("The direct call node does not resolve to a constant!");
@@ -63,7 +64,8 @@ public final class PEAgnosticInlineInvokePlugin implements InlineInvokePlugin {
             lastDirectCallNode = (JavaConstant) arg0.asConstant();
             return InlineInfo.DO_NOT_INLINE_WITH_EXCEPTION;
         }
-        if (original.equals(partialEvaluator.callIndirectMethod) || original.equals(partialEvaluator.call2IndirectMethod)) {
+        if (original.equals(partialEvaluator.callIndirectMethod) || original.equals(partialEvaluator.call1IndirectMethod) || original.equals(partialEvaluator.call2IndirectMethod) ||
+                        original.equals(partialEvaluator.call3IndirectMethod) || original.equals(partialEvaluator.call4IndirectMethod)) {
             indirectCall = true;
         }
         return inlineInfo;
@@ -71,7 +73,8 @@ public final class PEAgnosticInlineInvokePlugin implements InlineInvokePlugin {
 
     @Override
     public void notifyNotInlined(GraphBuilderContext b, ResolvedJavaMethod original, Invoke invoke) {
-        if (original.equals(partialEvaluator.callDirectMethod) || original.equals(partialEvaluator.call2DirectMethod)) {
+        if (original.equals(partialEvaluator.callDirectMethod) || original.equals(partialEvaluator.call1DirectMethod) || original.equals(partialEvaluator.call2DirectMethod) ||
+                        original.equals(partialEvaluator.call3DirectMethod) || original.equals(partialEvaluator.call4DirectMethod)) {
             if (lastDirectCallNode == null) {
                 if (indirectCall) {
                     indirectCall = false;

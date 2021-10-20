@@ -320,7 +320,8 @@ public abstract class PEGraphDecoder extends SimplifyingGraphDecoder {
                     int count = 0;
                     PEGraphDecoder.PEMethodScope scope = methodScope;
                     while (scope != null) {
-                        if (scope.method.equals(peRootForInlining)) {
+                        if (scope.method.equals(peRootForInlining) || scope.method.equals(peRootForInlining1) || scope.method.equals(peRootForInlining2) || scope.method.equals(peRootForInlining3) ||
+                                        scope.method.equals(peRootForInlining4)) {
                             count++;
                         }
                         scope = scope.caller;
@@ -702,11 +703,21 @@ public abstract class PEGraphDecoder extends SimplifyingGraphDecoder {
     private final ConcurrentHashMap<SpecialCallTargetCacheKey, Object> specialCallTargetCache;
     private final ConcurrentHashMap<ResolvedJavaMethod, Object> invocationPluginCache;
     private final ResolvedJavaMethod peRootForInlining;
+    private final ResolvedJavaMethod peRootForInlining1;
+    private final ResolvedJavaMethod peRootForInlining2;
+    private final ResolvedJavaMethod peRootForInlining3;
+    private final ResolvedJavaMethod peRootForInlining4;
     protected final SourceLanguagePositionProvider sourceLanguagePositionProvider;
 
     public PEGraphDecoder(Architecture architecture, StructuredGraph graph, CoreProviders providers, LoopExplosionPlugin loopExplosionPlugin, InvocationPlugins invocationPlugins,
                     InlineInvokePlugin[] inlineInvokePlugins, ParameterPlugin parameterPlugin,
-                    NodePlugin[] nodePlugins, ResolvedJavaMethod peRootForInlining, SourceLanguagePositionProvider sourceLanguagePositionProvider,
+                    NodePlugin[] nodePlugins,
+                    ResolvedJavaMethod peRootForInlining,
+                    ResolvedJavaMethod peRootForInlining1,
+                    ResolvedJavaMethod peRootForInlining2,
+                    ResolvedJavaMethod peRootForInlining3,
+                    ResolvedJavaMethod peRootForInlining4,
+                    SourceLanguagePositionProvider sourceLanguagePositionProvider,
                     ConcurrentHashMap<SpecialCallTargetCacheKey, Object> specialCallTargetCache,
                     ConcurrentHashMap<ResolvedJavaMethod, Object> invocationPluginCache) {
         super(architecture, graph, providers, true);
@@ -718,6 +729,10 @@ public abstract class PEGraphDecoder extends SimplifyingGraphDecoder {
         this.specialCallTargetCache = specialCallTargetCache;
         this.invocationPluginCache = invocationPluginCache;
         this.peRootForInlining = peRootForInlining;
+        this.peRootForInlining1 = peRootForInlining1;
+        this.peRootForInlining2 = peRootForInlining2;
+        this.peRootForInlining3 = peRootForInlining3;
+        this.peRootForInlining4 = peRootForInlining4;
         this.sourceLanguagePositionProvider = sourceLanguagePositionProvider;
     }
 

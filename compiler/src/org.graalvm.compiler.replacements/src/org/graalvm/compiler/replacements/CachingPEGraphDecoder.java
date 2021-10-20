@@ -77,10 +77,22 @@ public class CachingPEGraphDecoder extends PEGraphDecoder {
     public CachingPEGraphDecoder(Architecture architecture, StructuredGraph graph, Providers providers, GraphBuilderConfiguration graphBuilderConfig, OptimisticOptimizations optimisticOpts,
                     AllowAssumptions allowAssumptions, LoopExplosionPlugin loopExplosionPlugin, InvocationPlugins invocationPlugins, InlineInvokePlugin[] inlineInvokePlugins,
                     ParameterPlugin parameterPlugin,
-                    NodePlugin[] nodePlugins, ResolvedJavaMethod peRootForInlining, SourceLanguagePositionProvider sourceLanguagePositionProvider,
+                    NodePlugin[] nodePlugins,
+                    ResolvedJavaMethod peRootForInlining,
+                    ResolvedJavaMethod peRootForInlining1,
+                    ResolvedJavaMethod peRootForInlining2,
+                    ResolvedJavaMethod peRootForInlining3,
+                    ResolvedJavaMethod peRootForInlining4,
+                    SourceLanguagePositionProvider sourceLanguagePositionProvider,
                     BasePhase<? super CoreProviders> postParsingPhase, EconomicMap<ResolvedJavaMethod, EncodedGraph> graphCache) {
         super(architecture, graph, providers, loopExplosionPlugin,
-                        invocationPlugins, inlineInvokePlugins, parameterPlugin, nodePlugins, peRootForInlining, sourceLanguagePositionProvider,
+                        invocationPlugins, inlineInvokePlugins, parameterPlugin, nodePlugins,
+                        peRootForInlining,
+                        peRootForInlining1,
+                        peRootForInlining2,
+                        peRootForInlining3,
+                        peRootForInlining4,
+                        sourceLanguagePositionProvider,
                         new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
 
         this.providers = providers;

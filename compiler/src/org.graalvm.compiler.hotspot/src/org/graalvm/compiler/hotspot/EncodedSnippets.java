@@ -373,7 +373,7 @@ public class EncodedSnippets {
                         IntrinsicContext.CompilationContext context, EncodedGraph encodedGraph, boolean mustSucceed) {
             super(providers.getCodeCache().getTarget().arch, result, providers, null,
                             replacements.getGraphBuilderPlugins().getInvocationPlugins(), new InlineInvokePlugin[0], parameterPlugin,
-                            null, null, null, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+                            null, null, null, null, null, null, null, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
             this.method = method;
             this.encodedGraph = encodedGraph;
             this.mustSucceed = mustSucceed;

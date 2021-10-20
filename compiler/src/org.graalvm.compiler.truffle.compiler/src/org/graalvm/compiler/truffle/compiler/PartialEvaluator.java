@@ -131,19 +131,34 @@ public abstract class PartialEvaluator {
     private final CanonicalizerPhase canonicalizer;
     private final SnippetReflectionProvider snippetReflection;
     final ResolvedJavaMethod callDirectMethod;
+    final ResolvedJavaMethod call1DirectMethod;
     final ResolvedJavaMethod call2DirectMethod;
+    final ResolvedJavaMethod call3DirectMethod;
+    final ResolvedJavaMethod call4DirectMethod;
     protected final ResolvedJavaMethod callInlined;
+    protected final ResolvedJavaMethod call1Inlined;
     protected final ResolvedJavaMethod call2Inlined;
+    protected final ResolvedJavaMethod call3Inlined;
+    protected final ResolvedJavaMethod call4Inlined;
     final ResolvedJavaMethod callIndirectMethod;
+    final ResolvedJavaMethod call1IndirectMethod;
     final ResolvedJavaMethod call2IndirectMethod;
+    final ResolvedJavaMethod call3IndirectMethod;
+    final ResolvedJavaMethod call4IndirectMethod;
     private final ResolvedJavaMethod profiledPERoot;
+    private final ResolvedJavaMethod profiledPERoot1;
     private final ResolvedJavaMethod profiledPERoot2;
+    private final ResolvedJavaMethod profiledPERoot3;
+    private final ResolvedJavaMethod profiledPERoot4;
     private final GraphBuilderConfiguration configPrototype;
     private final InvocationPlugins decodingInvocationPlugins;
     private final NodePlugin[] nodePlugins;
     final KnownTruffleTypes knownTruffleTypes;
     final ResolvedJavaMethod callBoundary;
+    final ResolvedJavaMethod callBoundary1;
     final ResolvedJavaMethod callBoundary2;
+    final ResolvedJavaMethod callBoundary3;
+    final ResolvedJavaMethod callBoundary4;
     private volatile GraphBuilderConfiguration configForParsing;
 
     /**
@@ -174,16 +189,39 @@ public abstract class PartialEvaluator {
         final MetaAccessProvider metaAccess = providers.getMetaAccess();
         ResolvedJavaType type = runtime.resolveType(metaAccess, "org.graalvm.compiler.truffle.runtime.OptimizedCallTarget");
         ResolvedJavaMethod[] methods = type.getDeclaredMethods();
+
         this.callDirectMethod = findRequiredMethod(type, methods, "callDirect", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call1DirectMethod = findRequiredMethod(type, methods, "call1Direct", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;)Ljava/lang/Object;");
         this.call2DirectMethod = findRequiredMethod(type, methods, "call2Direct", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call3DirectMethod = findRequiredMethod(type, methods, "call3Direct", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call4DirectMethod = findRequiredMethod(type, methods, "call4Direct",
+                        "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
         this.callInlined = findRequiredMethod(type, methods, "callInlined", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call1Inlined = findRequiredMethod(type, methods, "call1Inlined", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;)Ljava/lang/Object;");
         this.call2Inlined = findRequiredMethod(type, methods, "call2Inlined", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call3Inlined = findRequiredMethod(type, methods, "call3Inlined", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call4Inlined = findRequiredMethod(type, methods, "call4Inlined",
+                        "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
         this.callIndirectMethod = findRequiredMethod(type, methods, "callIndirect", "(Lcom/oracle/truffle/api/nodes/Node;[Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call1IndirectMethod = findRequiredMethod(type, methods, "call1Indirect", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;)Ljava/lang/Object;");
         this.call2IndirectMethod = findRequiredMethod(type, methods, "call2Indirect", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call3IndirectMethod = findRequiredMethod(type, methods, "call3Indirect", "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.call4IndirectMethod = findRequiredMethod(type, methods, "call4Indirect",
+                        "(Lcom/oracle/truffle/api/nodes/Node;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
         this.profiledPERoot = findRequiredMethod(type, methods, "profiledPERoot", "([Ljava/lang/Object;)Ljava/lang/Object;");
+        this.profiledPERoot1 = findRequiredMethod(type, methods, "profiledPERoot1", "(Ljava/lang/Object;)Ljava/lang/Object;");
         this.profiledPERoot2 = findRequiredMethod(type, methods, "profiledPERoot2", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.profiledPERoot3 = findRequiredMethod(type, methods, "profiledPERoot3", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.profiledPERoot4 = findRequiredMethod(type, methods, "profiledPERoot4", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
         this.callBoundary = findRequiredMethod(type, methods, "callBoundary", "([Ljava/lang/Object;)Ljava/lang/Object;");
+        this.callBoundary1 = findRequiredMethod(type, methods, "callBoundary1", "(Ljava/lang/Object;)Ljava/lang/Object;");
         this.callBoundary2 = findRequiredMethod(type, methods, "callBoundary2", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.callBoundary3 = findRequiredMethod(type, methods, "callBoundary3", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        this.callBoundary4 = findRequiredMethod(type, methods, "callBoundary4", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 
         this.configPrototype = createGraphBuilderConfig(configForRoot, true);
         this.decodingInvocationPlugins = createDecodingInvocationPlugins(configForRoot.getPlugins());
@@ -283,23 +321,44 @@ public abstract class PartialEvaluator {
     }
 
     public ResolvedJavaMethod[] getCompilationRootMethods() {
-        return new ResolvedJavaMethod[]{profiledPERoot, profiledPERoot2, callInlined, call2Inlined, callDirectMethod, call2DirectMethod};
+        return new ResolvedJavaMethod[]{profiledPERoot, profiledPERoot1, profiledPERoot2, profiledPERoot3, profiledPERoot4,
+                        callInlined, call1Inlined, call2Inlined, call3Inlined, call4Inlined,
+                        callDirectMethod, call1DirectMethod, call2DirectMethod, call3DirectMethod, call4DirectMethod};
     }
 
     public ResolvedJavaMethod[] getNeverInlineMethods() {
-        return new ResolvedJavaMethod[]{callDirectMethod, call2DirectMethod, callIndirectMethod, call2IndirectMethod};
+        return new ResolvedJavaMethod[]{callDirectMethod, call1DirectMethod, call2DirectMethod, call3DirectMethod, call4DirectMethod,
+                        callIndirectMethod, call1IndirectMethod, call2IndirectMethod, call3IndirectMethod, call4IndirectMethod};
     }
 
     public ResolvedJavaMethod getCallDirect(int numArguments) {
+        if (numArguments == 1) {
+            return call1DirectMethod;
+        }
         if (numArguments == 2) {
             return call2DirectMethod;
+        }
+        if (numArguments == 3) {
+            return call3DirectMethod;
+        }
+        if (numArguments == 4) {
+            return call4DirectMethod;
         }
         return callDirectMethod;
     }
 
     public ResolvedJavaMethod getCallInlined(int numArgs) {
+        if (numArgs == 1) {
+            return call1Inlined;
+        }
         if (numArgs == 2) {
             return call2Inlined;
+        }
+        if (numArgs == 3) {
+            return call3Inlined;
+        }
+        if (numArgs == 4) {
+            return call4Inlined;
         }
         return callInlined;
     }
@@ -454,8 +513,17 @@ public abstract class PartialEvaluator {
      * @param compilable the Truffle AST being compiled.
      */
     public ResolvedJavaMethod rootForCallTarget(CompilableTruffleAST compilable) {
+        if (compilable.getNumberOfArguments() == 1) {
+            return profiledPERoot1;
+        }
         if (compilable.getNumberOfArguments() == 2) {
             return profiledPERoot2;
+        }
+        if (compilable.getNumberOfArguments() == 3) {
+            return profiledPERoot3;
+        }
+        if (compilable.getNumberOfArguments() == 4) {
+            return profiledPERoot4;
         }
         return profiledPERoot;
     }
@@ -467,8 +535,17 @@ public abstract class PartialEvaluator {
      * @param compilable the Truffle AST being compiled.
      */
     public ResolvedJavaMethod inlineRootForCallTarget(CompilableTruffleAST compilable) {
+        if (compilable.getNumberOfArguments() == 1) {
+            return call1Inlined;
+        }
         if (compilable.getNumberOfArguments() == 2) {
             return call2Inlined;
+        }
+        if (compilable.getNumberOfArguments() == 3) {
+            return call3Inlined;
+        }
+        if (compilable.getNumberOfArguments() == 4) {
+            return call4Inlined;
         }
         return callInlined;
     }
@@ -555,7 +632,7 @@ public abstract class PartialEvaluator {
         return new CachingPEGraphDecoder(architecture, request.graph, compilationUnitProviders, newConfig, TruffleCompilerImpl.Optimizations,
                         AllowAssumptions.ifNonNull(request.graph.getAssumptions()),
                         loopExplosionPlugin, decodingInvocationPlugins, inlineInvokePlugins, parameterPlugin, nodePluginList,
-                        request.compilable.getNumberOfArguments() == 2 ? call2Inlined : callInlined,
+                        callInlined, call1Inlined, call2Inlined, call3Inlined, call4Inlined,
                         sourceLanguagePositionProvider, postParsingPhase, graphCache);
     }
 

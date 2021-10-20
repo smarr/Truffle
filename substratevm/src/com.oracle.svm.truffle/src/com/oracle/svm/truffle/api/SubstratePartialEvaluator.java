@@ -69,8 +69,13 @@ public class SubstratePartialEvaluator extends PartialEvaluator {
                     InlineInvokePlugin[] inlineInvokePlugins, ParameterPlugin parameterPlugin, NodePlugin[] nodePlugins, SourceLanguagePositionProvider sourceLanguagePositionProvider,
                     EconomicMap<ResolvedJavaMethod, EncodedGraph> graphCache) {
         return new SubstratePEGraphDecoder(architecture, request.graph, providers.copyWith(compilationLocalConstantProvider), loopExplosionPlugin, invocationPlugins, inlineInvokePlugins,
-                        parameterPlugin, nodePlugins, callInlined, sourceLanguagePositionProvider,
-                        specialCallTargetCache, invocationPluginsCache);
+                        parameterPlugin, nodePlugins,
+                        callInlined,
+                        call1Inlined,
+                        call2Inlined,
+                        call3Inlined,
+                        call4Inlined,
+                        sourceLanguagePositionProvider, specialCallTargetCache, invocationPluginsCache);
     }
 
     @Override
