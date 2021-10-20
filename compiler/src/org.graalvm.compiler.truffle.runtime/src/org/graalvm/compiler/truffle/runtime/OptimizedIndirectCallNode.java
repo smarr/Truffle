@@ -44,8 +44,7 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
     /*
      * Should be instantiated with the runtime.
      */
-    OptimizedIndirectCallNode() {
-    }
+    OptimizedIndirectCallNode() {}
 
     @Override
     public Object call(CallTarget target, Object... arguments) {
@@ -65,11 +64,6 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
              * execution. We rather produce a truffle boundary call to the interpreter profile and
              * escape the arguments.
              */
-            if (this.seenInInterpreter) {
-                optimizedTarget.stopProfilingArguments();
-            } else {
-                profileIndirectArguments(optimizedTarget, arguments);
-            }
             return optimizedTarget.callIndirect(this, arguments);
         } catch (Throwable t) {
             if (exceptionProfile == null) {
@@ -100,11 +94,6 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
              * execution. We rather produce a truffle boundary call to the interpreter profile and
              * escape the arguments.
              */
-            if (this.seenInInterpreter) {
-                optimizedTarget.stopProfilingArguments();
-            } else {
-                profileIndirectArguments1(optimizedTarget, arg1);
-            }
             return optimizedTarget.call1Indirect(this, arg1);
         } catch (Throwable t) {
             if (exceptionProfile == null) {
@@ -135,11 +124,6 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
              * execution. We rather produce a truffle boundary call to the interpreter profile and
              * escape the arguments.
              */
-            if (this.seenInInterpreter) {
-                optimizedTarget.stopProfilingArguments();
-            } else {
-                profileIndirectArguments2(optimizedTarget, arg1, arg2);
-            }
             return optimizedTarget.call2Indirect(this, arg1, arg2);
         } catch (Throwable t) {
             if (exceptionProfile == null) {
@@ -170,11 +154,6 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
              * execution. We rather produce a truffle boundary call to the interpreter profile and
              * escape the arguments.
              */
-            if (this.seenInInterpreter) {
-                optimizedTarget.stopProfilingArguments();
-            } else {
-                profileIndirectArguments3(optimizedTarget, arg1, arg2, arg3);
-            }
             return optimizedTarget.call3Indirect(this, arg1, arg2, arg3);
         } catch (Throwable t) {
             if (exceptionProfile == null) {
@@ -205,11 +184,6 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
              * execution. We rather produce a truffle boundary call to the interpreter profile and
              * escape the arguments.
              */
-            if (this.seenInInterpreter) {
-                optimizedTarget.stopProfilingArguments();
-            } else {
-                profileIndirectArguments4(optimizedTarget, arg1, arg2, arg3, arg4);
-            }
             return optimizedTarget.call4Indirect(this, arg1, arg2, arg3, arg4);
         } catch (Throwable t) {
             if (exceptionProfile == null) {
@@ -220,30 +194,5 @@ public final class OptimizedIndirectCallNode extends IndirectCallNode {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
             throw OptimizedCallTarget.rethrow(profiledT);
         }
-    }
-
-    @TruffleBoundary
-    private static void profileIndirectArguments(OptimizedCallTarget optimizedTarget, Object... arguments) {
-        optimizedTarget.profileArguments(arguments);
-    }
-
-    @TruffleBoundary
-    private static void profileIndirectArguments1(OptimizedCallTarget optimizedTarget, Object arg1) {
-        optimizedTarget.profileArguments1(arg1);
-    }
-
-    @TruffleBoundary
-    private static void profileIndirectArguments2(OptimizedCallTarget optimizedTarget, Object arg1, Object arg2) {
-        optimizedTarget.profileArguments2(arg1, arg2);
-    }
-
-    @TruffleBoundary
-    private static void profileIndirectArguments3(OptimizedCallTarget optimizedTarget, Object arg1, Object arg2, Object arg3) {
-        optimizedTarget.profileArguments3(arg1, arg2, arg3);
-    }
-
-    @TruffleBoundary
-    private static void profileIndirectArguments4(OptimizedCallTarget optimizedTarget, Object arg1, Object arg2, Object arg3, Object arg4) {
-        optimizedTarget.profileArguments4(arg1, arg2, arg3, arg4);
     }
 }

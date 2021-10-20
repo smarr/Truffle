@@ -86,9 +86,7 @@ final class GraalRuntimeSupport extends RuntimeSupport {
      * if used in combination with {@link #callProfiled(CallTarget, Object...)}.
      */
     @Override
-    public void initializeProfile(CallTarget target, Class<?>[] argumentTypes) {
-        ((OptimizedCallTarget) target).initializeUnsafeArgumentTypes(argumentTypes);
-    }
+    public void initializeProfile(CallTarget target, Class<?>[] argumentTypes) {}
 
     @Override
     public <T extends Node> BlockNode<T> createBlockNode(T[] elements, ElementExecutor<T> executor) {
@@ -132,7 +130,6 @@ final class GraalRuntimeSupport extends RuntimeSupport {
     @Override
     public Object callProfiled(CallTarget target, Object... arguments) {
         OptimizedCallTarget castTarget = (OptimizedCallTarget) target;
-        assert castTarget.isValidArgumentProfile(arguments) : "Invalid argument profile. callProfiled requires to explicity initialize the profile.";
         return castTarget.doInvoke(arguments);
     }
 

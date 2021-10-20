@@ -115,10 +115,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
                     SpeculationLog.class, "speculationLog");
     private static final AtomicReferenceFieldUpdater<OptimizedCallTarget, Assumption> NODE_REWRITING_ASSUMPTION_UPDATER = AtomicReferenceFieldUpdater.newUpdater(OptimizedCallTarget.class,
                     Assumption.class, "nodeRewritingAssumption");
-    private static final AtomicReferenceFieldUpdater<OptimizedCallTarget, ArgumentsProfile> ARGUMENTS_PROFILE_UPDATER = AtomicReferenceFieldUpdater.newUpdater(
-                    OptimizedCallTarget.class, ArgumentsProfile.class, "argumentsProfile");
-    private static final AtomicReferenceFieldUpdater<OptimizedCallTarget, ReturnProfile> RETURN_PROFILE_UPDATER = AtomicReferenceFieldUpdater.newUpdater(
-                    OptimizedCallTarget.class, ReturnProfile.class, "returnProfile");
     private static final WeakReference<OptimizedDirectCallNode> NO_CALL = new WeakReference<>(null);
     private static final WeakReference<OptimizedDirectCallNode> MULTIPLE_CALLS = null;
     private static final String SPLIT_LOG_FORMAT = "[poly-event] %-70s %s";
@@ -146,29 +142,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
      * call target. Reset by TruffleFeature after boot image generation.
      */
     private int callAndLoopCount;
-
-    /*
-     * Profiling information (types and Assumption) are kept in 2-final-fields objects to ensure to
-     * always observe consistent types and assumption. This also enables using atomic operations to
-     * update the profiles safely. It is of utmost importance to never use profiled types without
-     * checking the Assumption, as otherwise it could cast objects to a different and incorrect
-     * type, which would crash.
-     *
-     * The profiled types are either an exact Class, or if it does not match then the profile type
-     * goes directly to null which means unprofiled. This is necessary because checking and casting
-     * is done in separate methods (in caller and callee respectively for arguments profiles, and
-     * the reverse for return profile). Therefore, we need two reads from the profile field, which
-     * means we could get a newer ArgumentsProfile, which would be invalid for the value passed in
-     * the CallTarget, except that the newer profile can only be less precise (= more null) and so
-     * will end up not casting at all the argument indices that did not match the profile.
-     *
-     * These fields are reset by TruffleFeature after boot image generation. These fields are
-     * initially null, and once they become non-null they never become null again (except through
-     * the reset of TruffleFeature).
-     */
-    @CompilationFinal private volatile ArgumentsProfile argumentsProfile;
-    @CompilationFinal private volatile ReturnProfile returnProfile;
-    @CompilationFinal private Class<? extends Throwable> profiledExceptionType;
 
     /**
      * Was the target already dequeued due to inlining. We keep track of this to prevent
@@ -250,12 +223,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
      * generation.
      */
     private volatile boolean compilationFailed;
-    /**
-     * Whether the call profile was preinitialized with a fixed set of type classes. In such a case
-     * the arguments will be cast using unsafe and the arguments array for calls is not checked
-     * against the profile, only asserted.
-     */
-    @CompilationFinal private boolean callProfiled;
 
     /**
      * Timestamp when the call target was initialized e.g. used the first time. Reset by
@@ -353,7 +320,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     @Override
     public int getNumberOfArguments() {
-        return argumentsProfile.getNumberOfArguments();
+        throw new IllegalAccessError();
     }
 
     /**
@@ -413,7 +380,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node prev = encapsulating.set(null);
         try {
-            profileArguments(args);
             return callIndirect(prev, args);
         } catch (Throwable t) {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
@@ -430,7 +396,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node prev = encapsulating.set(null);
         try {
-            profileArguments1(arg1);
             return call1Indirect(prev, arg1);
         } catch (Throwable t) {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
@@ -447,7 +412,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node prev = encapsulating.set(null);
         try {
-            profileArguments2(arg1, arg2);
             return call2Indirect(prev, arg1, arg2);
         } catch (Throwable t) {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
@@ -464,7 +428,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node prev = encapsulating.set(null);
         try {
-            profileArguments3(arg1, arg2, arg3);
             return call3Indirect(prev, arg1, arg2, arg3);
         } catch (Throwable t) {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
@@ -481,7 +444,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         EncapsulatingNodeReference encapsulating = EncapsulatingNodeReference.getCurrent();
         Node prev = encapsulating.set(null);
         try {
-            profileArguments4(arg1, arg2, arg3, arg4);
             return call4Indirect(prev, arg1, arg2, arg3, arg4);
         } catch (Throwable t) {
             GraalRuntimeAccessor.LANGUAGE.onThrowable(prev, null, t, null);
@@ -540,17 +502,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     public final Object callDirect(Node location, Object... args) {
         try {
-            try {
-                Object result;
-                profileArguments(args);
-                result = doInvoke(args);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke(args);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -559,17 +511,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     public final Object call1Direct(Node location, Object arg1) {
         try {
-            try {
-                Object result;
-                profileArguments1(arg1);
-                result = doInvoke1(arg1);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke1(arg1);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -578,17 +520,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     public final Object call2Direct(Node location, Object arg1, Object arg2) {
         try {
-            try {
-                Object result;
-                profileArguments2(arg1, arg2);
-                result = doInvoke2(arg1, arg2);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke2(arg1, arg2);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -597,17 +529,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     public final Object call3Direct(Node location, Object arg1, Object arg2, Object arg3) {
         try {
-            try {
-                Object result;
-                profileArguments3(arg1, arg2, arg3);
-                result = doInvoke3(arg1, arg2, arg3);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke3(arg1, arg2, arg3);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -616,17 +538,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     public final Object call4Direct(Node location, Object arg1, Object arg2, Object arg3, Object arg4) {
         try {
-            try {
-                Object result;
-                profileArguments4(arg1, arg2, arg3, arg4);
-                result = doInvoke4(arg1, arg2, arg3, arg4);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke4(arg1, arg2, arg3, arg4);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -835,12 +747,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (GraalCompilerDirectives.inFirstTier()) {
             firstTierCall();
         }
-        if (CompilerDirectives.inCompiledCode()) {
-            args = injectArgumentsProfile(originalArguments);
-        }
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args));
-        profileReturnValue(result);
-        return result;
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
@@ -848,22 +755,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (GraalCompilerDirectives.inFirstTier()) {
             firstTierCall();
         }
-        if (CompilerDirectives.inCompiledCode()) {
-            ArgumentsProfile argumentsProfile = this.argumentsProfile;
-            if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
-                Class<?>[] types = argumentsProfile.types;
-                boolean isCallProfiled = callProfiled;
-                // callProfiled: only the receiver type is exact.
-                Class<?> targetType = types[0];
-                boolean exact = true;
-                originalArg1 = targetType != null ? unsafeCast(originalArg1, targetType, true, true, exact) : originalArg1;
-            }
-        }
-
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1));
-
-        profileReturnValue(result);
-        return result;
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
@@ -871,26 +763,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (GraalCompilerDirectives.inFirstTier()) {
             firstTierCall();
         }
-        if (CompilerDirectives.inCompiledCode()) {
-            ArgumentsProfile argumentsProfile = this.argumentsProfile;
-            if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
-                Class<?>[] types = argumentsProfile.types;
-                boolean isCallProfiled = callProfiled;
-                // callProfiled: only the receiver type is exact.
-                Class<?> targetType = types[0];
-                boolean exact = true;
-                originalArg1 = targetType != null ? unsafeCast(originalArg1, targetType, true, true, exact) : originalArg1;
-
-                targetType = types[1];
-                exact = !isCallProfiled;
-                originalArg2 = targetType != null ? unsafeCast(originalArg2, targetType, true, true, exact) : originalArg2;
-            }
-        }
-
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2));
-
-        profileReturnValue(result);
-        return result;
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
@@ -898,30 +771,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (GraalCompilerDirectives.inFirstTier()) {
             firstTierCall();
         }
-        if (CompilerDirectives.inCompiledCode()) {
-            ArgumentsProfile argumentsProfile = this.argumentsProfile;
-            if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
-                Class<?>[] types = argumentsProfile.types;
-                boolean isCallProfiled = callProfiled;
-                // callProfiled: only the receiver type is exact.
-                Class<?> targetType = types[0];
-                boolean exact = true;
-                originalArg1 = targetType != null ? unsafeCast(originalArg1, targetType, true, true, exact) : originalArg1;
-
-                targetType = types[1];
-                exact = !isCallProfiled;
-                originalArg2 = targetType != null ? unsafeCast(originalArg2, targetType, true, true, exact) : originalArg2;
-
-                targetType = types[2];
-                exact = !isCallProfiled;
-                originalArg3 = targetType != null ? unsafeCast(originalArg3, targetType, true, true, exact) : originalArg3;
-            }
-        }
-
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3));
-
-        profileReturnValue(result);
-        return result;
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
@@ -929,34 +779,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (GraalCompilerDirectives.inFirstTier()) {
             firstTierCall();
         }
-        if (CompilerDirectives.inCompiledCode()) {
-            ArgumentsProfile argumentsProfile = this.argumentsProfile;
-            if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
-                Class<?>[] types = argumentsProfile.types;
-                boolean isCallProfiled = callProfiled;
-                // callProfiled: only the receiver type is exact.
-                Class<?> targetType = types[0];
-                boolean exact = true;
-                originalArg1 = targetType != null ? unsafeCast(originalArg1, targetType, true, true, exact) : originalArg1;
-
-                targetType = types[1];
-                exact = !isCallProfiled;
-                originalArg2 = targetType != null ? unsafeCast(originalArg2, targetType, true, true, exact) : originalArg2;
-
-                targetType = types[2];
-                exact = !isCallProfiled;
-                originalArg3 = targetType != null ? unsafeCast(originalArg3, targetType, true, true, exact) : originalArg3;
-
-                targetType = types[3];
-                exact = !isCallProfiled;
-                originalArg4 = targetType != null ? unsafeCast(originalArg4, targetType, true, true, exact) : originalArg4;
-            }
-        }
-
-        Object result = executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3, originalArg4));
-
-        profileReturnValue(result);
-        return result;
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3, originalArg4));
     }
 
     // This should be private but can't be. GR-19397
@@ -985,11 +808,10 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         try {
             return rootNode.execute(frame);
         } catch (ControlFlowException t) {
-            throw rethrow(profileExceptionType(t));
+            throw rethrow(t);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(null, this, profiledT, frame);
-            throw rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(null, this, t, frame);
+            throw rethrow(t);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert frame != null && this != null;
@@ -1201,7 +1023,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         return GraalTruffleRuntime.getRuntime().forObject(this);
     }
 
-    @SuppressWarnings({"unchecked"})
     static <E extends Throwable> RuntimeException rethrow(Throwable ex) throws E {
         throw (E) ex;
     }
@@ -1506,580 +1327,18 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     // region Arguments profiling
 
     // region Manual Arguments profiling
-    final void initializeUnsafeArgumentTypes(Class<?>[] argumentTypes) {
-        CompilerAsserts.neverPartOfCompilation();
-        ArgumentsProfile newProfile = new ArgumentsProfile(argumentTypes, "Custom profiled argument types");
-        if (updateArgumentsProfile(null, newProfile)) {
-            this.callProfiled = true;
-        } else {
-            transitionToInvalidArgumentsProfile();
-            throw new AssertionError("Argument types already initialized. initializeArgumentTypes() must be called before any profile is initialized.");
-        }
-    }
 
-    final boolean isValidArgumentProfile(Object[] args) {
-        assert callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        return argumentsProfile.assumption.isValid() && checkProfiledArgumentTypes(args, argumentsProfile.types);
-    }
-
-    private static boolean checkProfiledArgumentTypes(Object[] args, Class<?>[] types) {
-        assert types != null;
-        if (args.length != types.length) {
-            throw new ArrayIndexOutOfBoundsException();
-        }
-        // receiver type is always non-null and exact
-        if (types[0] != args[0].getClass()) {
-            throw new ClassCastException();
-        }
-        // other argument types may be inexact
-        for (int j = 1; j < types.length; j++) {
-            if (types[j] == null) {
-                continue;
-            }
-            types[j].cast(args[j]);
-            Objects.requireNonNull(args[j]);
-        }
-        return true;
-    }
     // endregion
 
     // This should be private but can't be. GR-19397
-    public final void stopProfilingArguments() {
-        assert !callProfiled;
-
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile != ArgumentsProfile.INVALID) {
-            // Argument profiling is not possible for targets of indirect calls.
-            // The assumption will invalidate the callee but we shouldn't invalidate the caller.
-            CompilerDirectives.transferToInterpreter();
-
-            transitionToInvalidArgumentsProfile();
-        }
-    }
-
-    private void transitionToInvalidArgumentsProfile() {
-        while (true) {
-            ArgumentsProfile oldProfile = argumentsProfile;
-            if (oldProfile == ArgumentsProfile.INVALID) {
-                /* Profile already invalid, nothing to do. */
-                return;
-            }
-            if (updateArgumentsProfile(oldProfile, ArgumentsProfile.INVALID)) {
-                return;
-            }
-            /* We lost the race, try again. */
-        }
-    }
-
-    private boolean updateArgumentsProfile(ArgumentsProfile oldProfile, ArgumentsProfile newProfile) {
-        if (oldProfile != null) {
-            /*
-             * The assumption for the old profile must be invalidated before installing a new
-             * profile.
-             */
-            oldProfile.assumption.invalidate();
-        }
-        return ARGUMENTS_PROFILE_UPDATER.compareAndSet(this, oldProfile, newProfile);
-    }
-
-    // This should be private but can't be. GR-19397
-    @ExplodeLoop
-    public final void profileArguments(Object[] args) {
-        assert !callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile == null) {
-            if (CompilerDirectives.inInterpreter()) {
-                initializeProfiledArgumentTypes(args);
-            }
-        } else {
-            Class<?>[] types = argumentsProfile.types;
-            if (types != null) {
-                if (types.length != args.length) {
-                    CompilerDirectives.transferToInterpreterAndInvalidate();
-                    transitionToInvalidArgumentsProfile();
-                } else if (argumentsProfile.assumption.isValid()) {
-                    for (int i = 0; i < types.length; i++) {
-                        Class<?> type = types[i];
-                        Object value = args[i];
-                        if (type != null && (value == null || value.getClass() != type)) {
-                            CompilerDirectives.transferToInterpreterAndInvalidate();
-                            updateProfiledArgumentTypes(args, argumentsProfile);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @ExplodeLoop
-    public final void profileArguments1(Object arg1) {
-        assert !callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile == null) {
-            if (CompilerDirectives.inInterpreter()) {
-                initializeProfiledArgumentTypes1(arg1);
-            }
-        } else {
-            Class<?>[] types = argumentsProfile.types;
-            if (types != null) {
-                if (types.length != 1) {
-                    CompilerDirectives.transferToInterpreterAndInvalidate();
-                    transitionToInvalidArgumentsProfile();
-                } else if (argumentsProfile.assumption.isValid()) {
-                    Class<?> type = types[0];
-                    Object value = arg1;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes1(arg1, argumentsProfile);
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    @ExplodeLoop
-    public final void profileArguments2(Object arg1, Object arg2) {
-        assert !callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile == null) {
-            if (CompilerDirectives.inInterpreter()) {
-                initializeProfiledArgumentTypes2(arg1, arg2);
-            }
-        } else {
-            Class<?>[] types = argumentsProfile.types;
-            if (types != null) {
-                if (types.length != 1) {
-                    CompilerDirectives.transferToInterpreterAndInvalidate();
-                    transitionToInvalidArgumentsProfile();
-                } else if (argumentsProfile.assumption.isValid()) {
-                    Class<?> type = types[0];
-                    Object value = arg1;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes2(arg1, arg2, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[1];
-                    value = arg2;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes2(arg1, arg2, argumentsProfile);
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    @ExplodeLoop
-    public final void profileArguments3(Object arg1, Object arg2, Object arg3) {
-        assert !callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile == null) {
-            if (CompilerDirectives.inInterpreter()) {
-                initializeProfiledArgumentTypes3(arg1, arg2, arg3);
-            }
-        } else {
-            Class<?>[] types = argumentsProfile.types;
-            if (types != null) {
-                if (types.length != 1) {
-                    CompilerDirectives.transferToInterpreterAndInvalidate();
-                    transitionToInvalidArgumentsProfile();
-                } else if (argumentsProfile.assumption.isValid()) {
-                    Class<?> type = types[0];
-                    Object value = arg1;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes3(arg1, arg2, arg3, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[1];
-                    value = arg2;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes3(arg1, arg2, arg3, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[2];
-                    value = arg3;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes3(arg1, arg2, arg3, argumentsProfile);
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    @ExplodeLoop
-    public final void profileArguments4(Object arg1, Object arg2, Object arg3, Object arg4) {
-        assert !callProfiled;
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        if (argumentsProfile == null) {
-            if (CompilerDirectives.inInterpreter()) {
-                initializeProfiledArgumentTypes4(arg1, arg2, arg3, arg4);
-            }
-        } else {
-            Class<?>[] types = argumentsProfile.types;
-            if (types != null) {
-                if (types.length != 1) {
-                    CompilerDirectives.transferToInterpreterAndInvalidate();
-                    transitionToInvalidArgumentsProfile();
-                } else if (argumentsProfile.assumption.isValid()) {
-                    Class<?> type = types[0];
-                    Object value = arg1;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes4(arg1, arg2, arg3, arg4, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[1];
-                    value = arg2;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes4(arg1, arg2, arg3, arg4, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[2];
-                    value = arg3;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes4(arg1, arg2, arg3, arg4, argumentsProfile);
-                        return;
-                    }
-
-                    type = types[3];
-                    value = arg4;
-                    if (type != null && (value == null || value.getClass() != type)) {
-                        CompilerDirectives.transferToInterpreterAndInvalidate();
-                        updateProfiledArgumentTypes4(arg1, arg2, arg3, arg4, argumentsProfile);
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    private void initializeProfiledArgumentTypes(Object[] args) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        final ArgumentsProfile newProfile;
-        if (args.length <= MAX_PROFILED_ARGUMENTS && engine.argumentTypeSpeculation) {
-            Class<?>[] types = args.length == 0 ? ArgumentsProfile.EMPTY_ARGUMENT_TYPES : new Class<?>[args.length];
-            for (int i = 0; i < args.length; i++) {
-                types[i] = classOf(args[i]);
-            }
-            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        if (!updateArgumentsProfile(null, newProfile)) {
-            // Another thread initialized the profile, we need to check it
-            profileArguments(args);
-        }
-    }
-
-    private void initializeProfiledArgumentTypes1(Object arg1) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        final ArgumentsProfile newProfile;
-        if (engine.argumentTypeSpeculation) {
-            Class<?>[] types = new Class<?>[1];
-            types[0] = classOf(arg1);
-            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        if (!updateArgumentsProfile(null, newProfile)) {
-            // Another thread initialized the profile, we need to check it
-            profileArguments1(arg1);
-        }
-    }
-
-    private void initializeProfiledArgumentTypes2(Object arg1, Object arg2) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        final ArgumentsProfile newProfile;
-        if (engine.argumentTypeSpeculation) {
-            Class<?>[] types = new Class<?>[2];
-            types[0] = classOf(arg1);
-            types[1] = classOf(arg2);
-            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        if (!updateArgumentsProfile(null, newProfile)) {
-            // Another thread initialized the profile, we need to check it
-            profileArguments2(arg1, arg2);
-        }
-    }
-
-    private void initializeProfiledArgumentTypes3(Object arg1, Object arg2, Object arg3) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        final ArgumentsProfile newProfile;
-        if (engine.argumentTypeSpeculation) {
-            Class<?>[] types = new Class<?>[3];
-            types[0] = classOf(arg1);
-            types[1] = classOf(arg2);
-            types[2] = classOf(arg3);
-            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        if (!updateArgumentsProfile(null, newProfile)) {
-            // Another thread initialized the profile, we need to check it
-            profileArguments3(arg1, arg2, arg3);
-        }
-    }
-
-    private void initializeProfiledArgumentTypes4(Object arg1, Object arg2, Object arg3, Object arg4) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        final ArgumentsProfile newProfile;
-        if (engine.argumentTypeSpeculation) {
-            Class<?>[] types = new Class<?>[4];
-            types[0] = classOf(arg1);
-            types[1] = classOf(arg2);
-            types[2] = classOf(arg3);
-            types[3] = classOf(arg4);
-            newProfile = new ArgumentsProfile(types, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        if (!updateArgumentsProfile(null, newProfile)) {
-            // Another thread initialized the profile, we need to check it
-            profileArguments4(arg1, arg2, arg3, arg4);
-        }
-    }
-
-    private void updateProfiledArgumentTypes(Object[] args, ArgumentsProfile oldProfile) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        Class<?>[] oldTypes = oldProfile.types;
-        Class<?>[] newTypes = new Class<?>[oldProfile.types.length];
-        for (int j = 0; j < oldTypes.length; j++) {
-            newTypes[j] = joinTypes(oldTypes[j], classOf(args[j]));
-        }
-
-        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        if (!updateArgumentsProfile(oldProfile, newProfile)) {
-            // Another thread updated the profile, we need to retry
-            profileArguments(args);
-        }
-    }
-
-    private void updateProfiledArgumentTypes1(Object arg1, ArgumentsProfile oldProfile) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        Class<?>[] oldTypes = oldProfile.types;
-        Class<?>[] newTypes = new Class<?>[1];
-        newTypes[0] = joinTypes(oldTypes[0], classOf(arg1));
-
-        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        if (!updateArgumentsProfile(oldProfile, newProfile)) {
-            // Another thread updated the profile, we need to retry
-            profileArguments1(arg1);
-        }
-    }
-
-    private void updateProfiledArgumentTypes2(Object arg1, Object arg2, ArgumentsProfile oldProfile) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        Class<?>[] oldTypes = oldProfile.types;
-        Class<?>[] newTypes = new Class<?>[2];
-        newTypes[0] = joinTypes(oldTypes[0], classOf(arg1));
-        newTypes[1] = joinTypes(oldTypes[1], classOf(arg2));
-
-        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        if (!updateArgumentsProfile(oldProfile, newProfile)) {
-            // Another thread updated the profile, we need to retry
-            profileArguments2(arg1, arg2);
-        }
-    }
-
-    private void updateProfiledArgumentTypes3(Object arg1, Object arg2, Object arg3, ArgumentsProfile oldProfile) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        Class<?>[] oldTypes = oldProfile.types;
-        Class<?>[] newTypes = new Class<?>[3];
-        newTypes[0] = joinTypes(oldTypes[0], classOf(arg1));
-        newTypes[1] = joinTypes(oldTypes[1], classOf(arg2));
-        newTypes[2] = joinTypes(oldTypes[2], classOf(arg3));
-
-        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        if (!updateArgumentsProfile(oldProfile, newProfile)) {
-            // Another thread updated the profile, we need to retry
-            profileArguments3(arg1, arg2, arg3);
-        }
-    }
-
-    private void updateProfiledArgumentTypes4(Object arg1, Object arg2, Object arg3, Object arg4, ArgumentsProfile oldProfile) {
-        CompilerAsserts.neverPartOfCompilation();
-        assert !callProfiled;
-        Class<?>[] oldTypes = oldProfile.types;
-        Class<?>[] newTypes = new Class<?>[4];
-        newTypes[0] = joinTypes(oldTypes[0], classOf(arg1));
-        newTypes[1] = joinTypes(oldTypes[1], classOf(arg2));
-        newTypes[2] = joinTypes(oldTypes[2], classOf(arg3));
-        newTypes[3] = joinTypes(oldTypes[3], classOf(arg4));
-
-        ArgumentsProfile newProfile = new ArgumentsProfile(newTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        if (!updateArgumentsProfile(oldProfile, newProfile)) {
-            // Another thread updated the profile, we need to retry
-            profileArguments4(arg1, arg2, arg3, arg4);
-        }
-    }
-
-    // This should be private but can't be. GR-19397
-    public final Object[] injectArgumentsProfile(Object[] originalArguments) {
-        assert CompilerDirectives.inCompiledCode();
-        ArgumentsProfile argumentsProfile = this.argumentsProfile;
-        Object[] args = originalArguments;
-        if (argumentsProfile != null && argumentsProfile.assumption.isValid()) {
-            Class<?>[] types = argumentsProfile.types;
-            args = unsafeCast(castArrayFixedLength(args, types.length), Object[].class, true, true, true);
-            args = castArgumentsImpl(args, types);
-        }
-        return args;
-    }
-
-    @ExplodeLoop
-    private Object[] castArgumentsImpl(Object[] originalArguments, Class<?>[] types) {
-        Object[] castArguments = new Object[types.length];
-        boolean isCallProfiled = callProfiled;
-        for (int i = 0; i < types.length; i++) {
-            // callProfiled: only the receiver type is exact.
-            Class<?> targetType = types[i];
-            boolean exact = !isCallProfiled || i == 0;
-            castArguments[i] = targetType != null ? unsafeCast(originalArguments[i], targetType, true, true, exact) : originalArguments[i];
-        }
-        return castArguments;
-    }
-
-    protected final ArgumentsProfile getInitializedArgumentsProfile() {
-        if (argumentsProfile == null) {
-            /*
-             * We always need an assumption. If this method is called before the profile was
-             * initialized, we have to be conservative and disable profiling.
-             */
-            CompilerDirectives.transferToInterpreterAndInvalidate();
-            updateArgumentsProfile(null, ArgumentsProfile.INVALID);
-            /* It does not matter if we lost the race, any non-null profile is sufficient. */
-            assert argumentsProfile != null;
-        }
-
-        return argumentsProfile;
-    }
 
     // endregion
     // region Return value profiling
 
-    private void profileReturnValue(Object result) {
-        ReturnProfile returnProfile = this.returnProfile;
-        if (returnProfile == null) {
-            // we only profile return values in the interpreter as we don't want to deoptimize for
-            // immediate compiles.
-            if (CompilerDirectives.inInterpreter() && engine.returnTypeSpeculation) {
-                final Class<?> type = classOf(result);
-                ReturnProfile newProfile = type == null ? ReturnProfile.INVALID : new ReturnProfile(type);
-                if (!RETURN_PROFILE_UPDATER.compareAndSet(this, null, newProfile)) {
-                    // Another thread initialized the profile, we need to check it
-                    profileReturnValue(result);
-                }
-            }
-        } else {
-            if (returnProfile.assumption.isValid() && (result == null || returnProfile.type != result.getClass())) {
-                // Immediately go to invalid, do not try to widen the type.
-                // See the comment above the returnProfile field.
-                CompilerDirectives.transferToInterpreterAndInvalidate();
-                /*
-                 * The assumption for the old profile must be invalidated before installing a new
-                 * profile.
-                 */
-                returnProfile.assumption.invalidate();
-                ReturnProfile previous = RETURN_PROFILE_UPDATER.getAndSet(this, ReturnProfile.INVALID);
-                assert previous == returnProfile || previous == ReturnProfile.INVALID;
-            }
-        }
-    }
-
-    private Object injectReturnValueProfile(Object result) {
-        ReturnProfile returnProfile = this.returnProfile;
-        if (CompilerDirectives.inCompiledCode() && returnProfile != null && returnProfile.assumption.isValid()) {
-            return OptimizedCallTarget.unsafeCast(result, returnProfile.type, true, true, true);
-        }
-        return result;
-    }
-
-    protected final ReturnProfile getInitializedReturnProfile() {
-        if (returnProfile == null) {
-            /*
-             * We always need an assumption. If this method is called before the profile was
-             * initialized, we have to be conservative and disable profiling.
-             */
-            CompilerDirectives.transferToInterpreterAndInvalidate();
-            RETURN_PROFILE_UPDATER.compareAndSet(this, null, ReturnProfile.INVALID);
-            assert returnProfile != null;
-        }
-
-        return returnProfile;
-    }
-
     // endregion
     // region Exception profiling
 
-    @SuppressWarnings("unchecked")
-    private <T extends Throwable> T profileExceptionType(T value) {
-        Class<? extends Throwable> clazz = profiledExceptionType;
-        if (clazz != Throwable.class) {
-            if (clazz != null && value.getClass() == clazz) {
-                if (CompilerDirectives.inInterpreter()) {
-                    return value;
-                } else {
-                    return (T) CompilerDirectives.castExact(value, clazz);
-                }
-            } else {
-                CompilerDirectives.transferToInterpreterAndInvalidate();
-                if (clazz == null) {
-                    profiledExceptionType = value.getClass();
-                } else {
-                    profiledExceptionType = Throwable.class;
-                }
-            }
-        }
-        return value;
-    }
-
     // endregion
-
-    private static Class<?> classOf(Object arg) {
-        return arg != null ? arg.getClass() : null;
-    }
-
-    private static Class<?> joinTypes(Class<?> class1, Class<?> class2) {
-        // Immediately give up for that argument, do not try to widen the type.
-        // See the comment above the argumentsProfile field.
-        if (class1 == class2) {
-            return class1;
-        } else {
-            return null;
-        }
-    }
 
     private static OptimizedAssumption createInvalidAssumption(String name) {
         OptimizedAssumption result = createValidAssumption(name);
@@ -2314,12 +1573,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (profile == null) {
             return false;
         }
-        if (callProfiled) {
-            // call profile already initialized
-            return true;
-        }
-        assert returnProfile == null : "return profile already initialized";
-        assert argumentsProfile == null : "argument profile already initialized";
 
         Class<?>[] argumentTypes = profile.getArgumentTypes();
 
@@ -2337,9 +1590,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         } else {
             returnProfile = ReturnProfile.INVALID;
         }
-
-        this.returnProfile = returnProfile;
-        this.argumentsProfile = newProfile;
 
         return true;
     }
