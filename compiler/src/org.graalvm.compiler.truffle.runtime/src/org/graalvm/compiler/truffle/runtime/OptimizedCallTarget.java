@@ -60,8 +60,6 @@ import com.oracle.truffle.api.impl.DefaultCompilerOptions;
 import com.oracle.truffle.api.nodes.BlockNode;
 import com.oracle.truffle.api.nodes.ControlFlowException;
 import com.oracle.truffle.api.nodes.EncapsulatingNodeReference;
-import com.oracle.truffle.api.nodes.ExecutionSignature;
-import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.NodeUtil;
 import com.oracle.truffle.api.nodes.NodeVisitor;
@@ -118,7 +116,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     private static final WeakReference<OptimizedDirectCallNode> NO_CALL = new WeakReference<>(null);
     private static final WeakReference<OptimizedDirectCallNode> MULTIPLE_CALLS = null;
     private static final String SPLIT_LOG_FORMAT = "[poly-event] %-70s %s";
-    private static final int MAX_PROFILED_ARGUMENTS = 256;
 
     /** The AST to be executed when this call target is called. */
     private final RootNode rootNode;
@@ -127,96 +124,11 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     @CompilationFinal protected volatile boolean initialized;
 
     /**
-     * The call threshold is counted up for each real call until it reaches a
-     * {@link PolyglotCompilerOptions#FirstTierCompilationThreshold first tier} or
-     * {@link PolyglotCompilerOptions#CompilationThreshold second tier} compilation threshold, and
-     * triggers a {@link #compile(boolean) compilation}. It is incremented for each real call to the
-     * call target. Reset by TruffleFeature after boot image generation.
-     */
-    private int callCount;
-    /**
-     * The call and loop threshold is counted up for each real call until it reaches a
-     * {@link PolyglotCompilerOptions#FirstTierCompilationThreshold first tier} or
-     * {@link PolyglotCompilerOptions#CompilationThreshold second tier} compilation threshold, and
-     * triggers a {@link #compile(boolean) compilation}. It is incremented for each real call to the
-     * call target. Reset by TruffleFeature after boot image generation.
-     */
-    private int callAndLoopCount;
-
-    /**
      * Was the target already dequeued due to inlining. We keep track of this to prevent
      * continuously dequeuing the target for single caller when the single caller itself has
      * multiple callers.
      */
     private volatile boolean dequeueInlined = false;
-
-    public static final class ArgumentsProfile {
-        private static final String ARGUMENT_TYPES_ASSUMPTION_NAME = "Profiled Argument Types";
-        private static final Class<?>[] EMPTY_ARGUMENT_TYPES = new Class<?>[0];
-        private static final ArgumentsProfile INVALID = new ArgumentsProfile();
-
-        // Invariant to simplify conditions: types is non-null if assumption is valid
-        final OptimizedAssumption assumption;
-        @CompilationFinal(dimensions = 1) final Class<?>[] types;
-
-        private ArgumentsProfile() {
-            this.assumption = createInvalidAssumption(ARGUMENT_TYPES_ASSUMPTION_NAME);
-            this.types = null;
-        }
-
-        private ArgumentsProfile(Class<?>[] types, String assumptionName) {
-            assert types != null;
-            this.assumption = createValidAssumption(assumptionName);
-            this.types = types;
-        }
-
-        public OptimizedAssumption getAssumption() {
-            return assumption;
-        }
-
-        /**
-         * The returned array is read-only.
-         */
-        public Class<?>[] getTypes() {
-            return types;
-        }
-
-        public int getNumberOfArguments() {
-            if (types == null) {
-                return -1;
-            }
-
-            return types.length;
-        }
-    }
-
-    public static final class ReturnProfile {
-        private static final String RETURN_TYPE_ASSUMPTION_NAME = "Profiled Return Type";
-        private static final ReturnProfile INVALID = new ReturnProfile();
-
-        // Invariant to simplify conditions: type is non-null if assumption is valid
-        final OptimizedAssumption assumption;
-        final Class<?> type;
-
-        private ReturnProfile() {
-            this.assumption = createInvalidAssumption(RETURN_TYPE_ASSUMPTION_NAME);
-            this.type = null;
-        }
-
-        private ReturnProfile(Class<?> type) {
-            assert type != null;
-            this.assumption = createValidAssumption(RETURN_TYPE_ASSUMPTION_NAME);
-            this.type = type;
-        }
-
-        public OptimizedAssumption getAssumption() {
-            return assumption;
-        }
-
-        public Class<?> getType() {
-            return type;
-        }
-    }
 
     /**
      * Set if compilation failed or was ignored. Reset by TruffleFeature after boot image
@@ -294,7 +206,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         this.speculationLog = sourceCallTarget != null ? sourceCallTarget.getSpeculationLog() : null;
         this.rootNode = rootNode;
         this.engine = GraalTVMCI.getEngineData(rootNode);
-        this.resetCompilationProfile();
         // Do not adopt children of OSRRootNodes; we want to preserve the parent of the LoopNode.
         this.uninitializedNodeCount = !(rootNode instanceof OSRRootNode) ? GraalRuntimeAccessor.NODES.adoptChildrenAndCount(rootNode) : -1;
         GraalRuntimeAccessor.NODES.setCallTarget(rootNode, this);
@@ -366,11 +277,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     @Override
     public final RootNode getRootNode() {
         return rootNode;
-    }
-
-    public final void resetCompilationProfile() {
-        this.callCount = 0;
-        this.callAndLoopCount = 0;
     }
 
     @Override
@@ -708,99 +614,33 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     }
 
     private boolean interpreterCall() {
-        if (isValid()) {
-            // Native entry stubs were deoptimized => reinstall.
-            runtime().bypassedInstalledCode(this);
-        }
         ensureInitialized();
-        int intCallCount = this.callCount;
-        this.callCount = intCallCount == Integer.MAX_VALUE ? intCallCount : ++intCallCount;
-        int intLoopCallCount = this.callAndLoopCount;
-        this.callAndLoopCount = intLoopCallCount == Integer.MAX_VALUE ? intLoopCallCount : ++intLoopCallCount;
-
-        // Check if call target is hot enough to compile
-        if (shouldCompileImpl(intCallCount, intLoopCallCount)) {
-            return compile(!engine.multiTier);
-        }
         return false;
-    }
-
-    private boolean shouldCompileImpl(int intCallCount, int intLoopCallCount) {
-        return intCallCount >= engine.callThresholdInInterpreter //
-                        && intLoopCallCount >= engine.callAndLoopThresholdInInterpreter //
-                        && !compilationFailed //
-                        && !isSubmittedForCompilation()
-                        /*
-                         * Compilation of OSR loop call target is scheduled in
-                         * OptimizedOSRLoopNode#compileImpl.
-                         */
-                        && !(getRootNode() instanceof OSRRootNode);
-    }
-
-    public final boolean shouldCompile() {
-        return !isValid() && shouldCompileImpl(this.callCount, this.callAndLoopCount);
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot(Object[] originalArguments) {
-        Object[] args = originalArguments;
-        if (GraalCompilerDirectives.inFirstTier()) {
-            firstTierCall();
-        }
-        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), args));
+        return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArguments));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot1(Object originalArg1) {
-        if (GraalCompilerDirectives.inFirstTier()) {
-            firstTierCall();
-        }
         return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot2(Object originalArg1, Object originalArg2) {
-        if (GraalCompilerDirectives.inFirstTier()) {
-            firstTierCall();
-        }
         return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot3(Object originalArg1, Object originalArg2, Object originalArg3) {
-        if (GraalCompilerDirectives.inFirstTier()) {
-            firstTierCall();
-        }
         return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3));
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     protected final Object profiledPERoot4(Object originalArg1, Object originalArg2, Object originalArg3, Object originalArg4) {
-        if (GraalCompilerDirectives.inFirstTier()) {
-            firstTierCall();
-        }
         return executeRootNode(createFrame(getRootNode().getFrameDescriptor(), originalArg1, originalArg2, originalArg3, originalArg4));
-    }
-
-    // This should be private but can't be. GR-19397
-    public final boolean firstTierCall() {
-        // this is partially evaluated so the second part should fold to a constant.
-        int firstTierCallCount = this.callCount;
-        this.callCount = firstTierCallCount == Integer.MAX_VALUE ? firstTierCallCount : ++firstTierCallCount;
-        int firstTierLoopCallCount = this.callAndLoopCount;
-        this.callAndLoopCount = firstTierLoopCallCount == Integer.MAX_VALUE ? firstTierLoopCallCount : ++firstTierLoopCallCount;
-        if (firstTierCallCount >= engine.callThresholdInFirstTier //
-                        && firstTierLoopCallCount >= engine.callAndLoopThresholdInFirstTier //
-                        && !compilationFailed //
-                        && !isSubmittedForCompilation()) {
-            return lastTierCompile();
-        }
-        return false;
-    }
-
-    @TruffleBoundary
-    private boolean lastTierCompile() {
-        return compile(true);
     }
 
     private Object executeRootNode(VirtualFrame frame) {
@@ -1203,13 +1043,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         return new FrameWithoutBoxing(descriptor, arg1, arg2, arg3, arg4);
     }
 
-    final void onLoopCount(int count) {
-        assert count >= 0;
-        int oldLoopCallCount = this.callAndLoopCount;
-        int newLoopCallCount = oldLoopCallCount + count;
-        this.callAndLoopCount = newLoopCallCount >= oldLoopCallCount ? newLoopCallCount : Integer.MAX_VALUE;
-    }
-
     @Override
     public final boolean nodeReplaced(Node oldNode, Node newNode, CharSequence reason) {
         CompilerAsserts.neverPartOfCompilation();
@@ -1256,11 +1089,11 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
 
     @Override
     public final int getCallCount() {
-        return callCount;
+        return 0;
     }
 
     public final int getCallAndLoopCount() {
-        return callAndLoopCount;
+        return 0;
     }
 
     public final long getInitializedTimestamp() {
@@ -1563,34 +1396,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         if (isInitialized()) {
             throw new IllegalStateException("Cannot prepare for AOT if call target is already initialized.");
         }
-        /*
-         * We do not validate the call target as we are not technically entered in any context when
-         * we do AOT compilation.
-         */
-        initialize(false);
-
-        ExecutionSignature profile = GraalRuntimeAccessor.NODES.prepareForAOT(rootNode);
-        if (profile == null) {
-            return false;
-        }
-
-        Class<?>[] argumentTypes = profile.getArgumentTypes();
-
-        ArgumentsProfile newProfile;
-        if (argumentTypes != null && argumentTypes.length <= MAX_PROFILED_ARGUMENTS && engine.argumentTypeSpeculation) {
-            newProfile = new ArgumentsProfile(argumentTypes, ArgumentsProfile.ARGUMENT_TYPES_ASSUMPTION_NAME);
-        } else {
-            newProfile = ArgumentsProfile.INVALID;
-        }
-
-        ReturnProfile returnProfile;
-        Class<?> returnType = profile.getReturnType();
-        if (returnType != null && returnType != Object.class) {
-            returnProfile = new ReturnProfile(returnType);
-        } else {
-            returnProfile = ReturnProfile.INVALID;
-        }
-
         return true;
     }
 }

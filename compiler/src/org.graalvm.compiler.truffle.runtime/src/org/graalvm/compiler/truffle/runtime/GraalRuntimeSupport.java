@@ -30,7 +30,6 @@ import org.graalvm.options.OptionDescriptors;
 import org.graalvm.options.OptionValues;
 
 import com.oracle.truffle.api.CallTarget;
-import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.TruffleLogger;
 import com.oracle.truffle.api.impl.Accessor.RuntimeSupport;
 import com.oracle.truffle.api.nodes.BlockNode;
@@ -49,25 +48,7 @@ final class GraalRuntimeSupport extends RuntimeSupport {
 
     @ExplodeLoop
     @Override
-    public void onLoopCount(Node source, int count) {
-        CompilerAsserts.partialEvaluationConstant(source);
-
-        Node node = source;
-        Node parentNode = source != null ? source.getParent() : null;
-        while (node != null) {
-            if (node instanceof OptimizedOSRLoopNode) {
-                ((OptimizedOSRLoopNode) node).reportChildLoopCount(count);
-            }
-            parentNode = node;
-            node = node.getParent();
-        }
-        if (parentNode instanceof RootNode) {
-            CallTarget target = ((RootNode) parentNode).getCallTarget();
-            if (target instanceof OptimizedCallTarget) {
-                ((OptimizedCallTarget) target).onLoopCount(count);
-            }
-        }
-    }
+    public void onLoopCount(Node source, int count) {}
 
     @Override
     public OptionDescriptors getEngineOptionDescriptors() {

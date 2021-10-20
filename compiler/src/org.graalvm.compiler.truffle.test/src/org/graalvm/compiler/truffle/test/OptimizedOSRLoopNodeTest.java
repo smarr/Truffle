@@ -285,7 +285,6 @@ public class OptimizedOSRLoopNodeTest extends TestWithSynchronousCompiling {
         TestRootNode rootNode = new TestRootNode(osrThreshold, factory, repeating);
         OptimizedCallTarget target = (OptimizedCallTarget) runtime.createCallTarget(rootNode);
         target.call(osrThreshold + 1);
-        target.resetCompilationProfile();
         assertCompiled(rootNode.getOSRTarget());
 
         repeating.invalidationCounter = 5;
@@ -327,7 +326,6 @@ public class OptimizedOSRLoopNodeTest extends TestWithSynchronousCompiling {
         assertSame(rootNode.getOSRTarget(), osrTarget);
 
         // after invalidating the outer method the osr target should still be valid and used
-        target.resetCompilationProfile();
         target.call(15);
 
         assertCompiled(rootNode.getOSRTarget());
