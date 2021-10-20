@@ -543,9 +543,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the intepreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke(args);
-        }
         return profiledPERoot(args);
     }
 
@@ -559,9 +556,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the intepreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke1(arg1);
-        }
         return profiledPERoot1(arg1);
     }
 
@@ -575,9 +569,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the intepreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke2(arg1, arg2);
-        }
         return profiledPERoot2(arg1, arg2);
     }
 
@@ -591,9 +582,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the intepreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke3(arg1, arg2, arg3);
-        }
         return profiledPERoot3(arg1, arg2, arg3);
     }
 
@@ -607,15 +595,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * Any additional code here will likely have significant impact on the intepreter call
          * performance.
          */
-        if (interpreterCall()) {
-            return doInvoke4(arg1, arg2, arg3, arg4);
-        }
         return profiledPERoot4(arg1, arg2, arg3, arg4);
-    }
-
-    private boolean interpreterCall() {
-        ensureInitialized();
-        return false;
     }
 
     // Note: {@code PartialEvaluator} looks up this method by name and signature.

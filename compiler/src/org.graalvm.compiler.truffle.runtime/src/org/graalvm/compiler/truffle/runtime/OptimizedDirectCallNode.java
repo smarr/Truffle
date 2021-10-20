@@ -28,7 +28,6 @@ import org.graalvm.compiler.truffle.common.TruffleCallNode;
 
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerAsserts;
-import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.CompilerOptions;
 import com.oracle.truffle.api.impl.DefaultCompilerOptions;
@@ -47,7 +46,6 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
     private boolean inliningForced;
     @CompilationFinal private Class<? extends Throwable> exceptionProfile;
     @CompilationFinal private OptimizedCallTarget splitCallTarget;
-    private volatile boolean splitDecided;
 
     /*
      * Should be instantiated with the runtime.
@@ -59,99 +57,57 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
 
     @Override
     public Object call(Object... arguments) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
+        OptimizedCallTarget target = (OptimizedCallTarget) callTarget;
         try {
             return target.callDirect(this, arguments);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, t, null);
+            throw OptimizedCallTarget.rethrow(t);
         }
     }
 
     @Override
     public Object call1(Object arg1) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
+        OptimizedCallTarget target = (OptimizedCallTarget) callTarget;
         try {
             return target.call1Direct(this, arg1);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, t, null);
+            throw OptimizedCallTarget.rethrow(t);
         }
     }
 
     @Override
     public Object call2(Object arg1, Object arg2) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
+        OptimizedCallTarget target = (OptimizedCallTarget) callTarget;
         try {
             return target.call2Direct(this, arg1, arg2);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, t, null);
+            throw OptimizedCallTarget.rethrow(t);
         }
     }
 
     @Override
     public Object call3(Object arg1, Object arg2, Object arg3) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
+        OptimizedCallTarget target = (OptimizedCallTarget) callTarget;
         try {
             return target.call3Direct(this, arg1, arg2, arg3);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, t, null);
+            throw OptimizedCallTarget.rethrow(t);
         }
     }
 
     @Override
     public Object call4(Object arg1, Object arg2, Object arg3, Object arg4) {
-        OptimizedCallTarget target = getCurrentCallTarget();
-        if (CompilerDirectives.inInterpreter()) {
-            target = onInterpreterCall(target);
-        }
+        OptimizedCallTarget target = (OptimizedCallTarget) callTarget;
         try {
             return target.call4Direct(this, arg1, arg2, arg3, arg4);
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, profiledT, null);
-            throw OptimizedCallTarget.rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(this, null, t, null);
+            throw OptimizedCallTarget.rethrow(t);
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T extends Throwable> T profileExceptionType(T value) {
-        Class<? extends Throwable> clazz = exceptionProfile;
-        if (clazz != Throwable.class) {
-            if (clazz != null && value.getClass() == clazz) {
-                if (CompilerDirectives.inInterpreter()) {
-                    return value;
-                } else {
-                    return (T) CompilerDirectives.castExact(value, clazz);
-                }
-            } else {
-                CompilerDirectives.transferToInterpreterAndInvalidate();
-                if (clazz == null) {
-                    exceptionProfile = value.getClass();
-                } else {
-                    exceptionProfile = Throwable.class;
-                }
-            }
-        }
-        return value;
     }
 
     @Override
@@ -204,21 +160,6 @@ public final class OptimizedDirectCallNode extends DirectCallNode implements Tru
     @Override
     public OptimizedCallTarget getClonedCallTarget() {
         return splitCallTarget;
-    }
-
-    /**
-     * @return The current call target (ie. getCurrentCallTarget) In case a splitting decision was
-     *         made during this interpreter call, the argument target otherwise.
-     */
-    private OptimizedCallTarget onInterpreterCall(OptimizedCallTarget target) {
-        if (target.isNeedsSplit() && !splitDecided) {
-            // We intentionally avoid locking here because worst case is a double decision printed
-            // and preventing that is not worth the performance impact of locking
-            splitDecided = true;
-            TruffleSplittingStrategy.beforeCall(this, target);
-            return getCurrentCallTarget();
-        }
-        return target;
     }
 
     /** Used by the splitting strategy to install new targets. */
