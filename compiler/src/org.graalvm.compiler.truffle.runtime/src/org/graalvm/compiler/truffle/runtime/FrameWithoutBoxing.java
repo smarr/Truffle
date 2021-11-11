@@ -230,9 +230,24 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
 
     @Override
     public long getLong(FrameSlot slot) throws FrameSlotTypeException {
-        int slotIndex = getFrameSlotIndex(slot);
-        boolean condition = verifyGet(slotIndex, LONG_TAG);
-        return getLongUnsafe(slotIndex, slot, condition);
+        int slotIndex = slot.getIndex();
+        byte[] tagsArr = unsafeCast(tags, byte[].class, true, true, true);
+
+        if (CompilerDirectives.inInterpreter() && slotIndex >= tagsArr.length) {
+            if (!resize()) {
+                throw new IllegalArgumentException(String.format("The frame slot '%s' is not known by the frame descriptor.", slotIndex));
+            }
+        }
+
+        boolean condition = tagsArr[slotIndex] == LONG_TAG;
+        if (!condition) {
+            CompilerDirectives.transferToInterpreterAndInvalidate();
+            throw new FrameSlotTypeException();
+        }
+
+        long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + slotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
+        long[] primitives = unsafeCast(this.primitiveLocals, long[].class, true, true, true);
+        return UNSAFE.getLong(primitives, offset);
     }
 
     long getLongUnsafe(int slotIndex, FrameSlot slot, boolean condition) {
@@ -242,9 +257,20 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
 
     @Override
     public void setLong(FrameSlot slot, long value) {
-        int slotIndex = getFrameSlotIndex(slot);
-        verifySet(slotIndex, LONG_TAG);
-        setLongUnsafe(slotIndex, slot, value);
+        int slotIndex = slot.getIndex();
+        byte[] tagsArr = unsafeCast(tags, byte[].class, true, true, true);
+
+        if (CompilerDirectives.inInterpreter() && slotIndex >= tagsArr.length) {
+            if (!resize()) {
+                throw new IllegalArgumentException(String.format("The frame slot '%s' is not known by the frame descriptor.", slotIndex));
+            }
+        }
+
+        tagsArr[slotIndex] = LONG_TAG;
+
+        long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + slotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
+        long[] primitives = unsafeCast(this.primitiveLocals, long[].class, true, true, true);
+        UNSAFE.putLong(primitives, offset, value);
     }
 
     private void setLongUnsafe(int slotIndex, FrameSlot slot, long value) {
@@ -384,15 +410,22 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
     }
 
     byte getTag(FrameSlot slot) {
-        int slotIndex = getFrameSlotIndex(slot);
-        byte[] cachedTags = getTags();
+        int slotIndex = slot.getIndex();
+        byte[] cachedTags = unsafeCast(tags, byte[].class, true, true, true);
         if (slotIndex < cachedTags.length) {
             return cachedTags[slotIndex];
         }
 
         CompilerDirectives.transferToInterpreterAndInvalidate();
-        resize();
-        return getTags()[slotIndex];
+        int oldSize = cachedTags.length;
+        int newSize = descriptor.getSize();
+
+        locals = Arrays.copyOf(locals, newSize);
+        Arrays.fill(locals, oldSize, newSize, descriptor.getDefaultValue());
+        primitiveLocals = Arrays.copyOf(primitiveLocals, newSize);
+        byte[] newTags = Arrays.copyOf(cachedTags, newSize);
+        tags = newTags;
+        return newTags[slotIndex];
     }
 
     @Override
