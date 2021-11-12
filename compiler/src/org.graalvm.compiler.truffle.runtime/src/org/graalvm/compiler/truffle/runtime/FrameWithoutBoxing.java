@@ -136,11 +136,11 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
         return getObjectUnsafe(slotIndex, slot, condition);
     }
 
-    private Object[] getLocals() {
+    Object[] getLocals() {
         return unsafeCast(locals, Object[].class, true, true, true);
     }
 
-    private long[] getPrimitiveLocals() {
+    long[] getPrimitiveLocals() {
         return unsafeCast(this.primitiveLocals, long[].class, true, true, true);
     }
 
@@ -343,7 +343,7 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
         throw new FrameSlotTypeException();
     }
 
-    private byte[] resizeAndGetTagsOrThrow(int slotIndex) {
+    byte[] resizeAndGetTagsOrThrow(int slotIndex) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
         if (resize()) {
             byte[] newTags = getTags();
@@ -419,7 +419,7 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
         }
     }
 
-    private byte[] resizeAndGetTags() {
+    byte[] resizeAndGetTags() {
         CompilerDirectives.transferToInterpreterAndInvalidate();
         resize();
         return getTags();
@@ -474,12 +474,12 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
     }
 
     @SuppressWarnings("unused")
-    private static int unsafeGetInt(Object receiver, long offset, boolean condition, Object locationIdentity) {
+    static int unsafeGetInt(Object receiver, long offset, boolean condition, Object locationIdentity) {
         return UNSAFE.getInt(receiver, offset);
     }
 
     @SuppressWarnings("unused")
-    private static long unsafeGetLong(Object receiver, long offset, boolean condition, Object locationIdentity) {
+    static long unsafeGetLong(Object receiver, long offset, boolean condition, Object locationIdentity) {
         return UNSAFE.getLong(receiver, offset);
     }
 
@@ -489,12 +489,12 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
     }
 
     @SuppressWarnings("unused")
-    private static double unsafeGetDouble(Object receiver, long offset, boolean condition, Object locationIdentity) {
+    static double unsafeGetDouble(Object receiver, long offset, boolean condition, Object locationIdentity) {
         return UNSAFE.getDouble(receiver, offset);
     }
 
     @SuppressWarnings("unused")
-    private static Object unsafeGetObject(Object receiver, long offset, boolean condition, Object locationIdentity) {
+    static Object unsafeGetObject(Object receiver, long offset, boolean condition, Object locationIdentity) {
         return UNSAFE.getObject(receiver, offset);
     }
 
@@ -514,12 +514,12 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
     }
 
     @SuppressWarnings("unused")
-    private static void unsafePutDouble(Object receiver, long offset, double value, Object locationIdentity) {
+    static void unsafePutDouble(Object receiver, long offset, double value, Object locationIdentity) {
         UNSAFE.putDouble(receiver, offset, value);
     }
 
     @SuppressWarnings("unused")
-    private static void unsafePutObject(Object receiver, long offset, Object value, Object locationIdentity) {
+    static void unsafePutObject(Object receiver, long offset, Object value, Object locationIdentity) {
         UNSAFE.putObject(receiver, offset, value);
     }
 
