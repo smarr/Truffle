@@ -140,7 +140,7 @@ public final class DefaultTruffleRuntime implements TruffleRuntime {
 
     @Override
     public FrameRead createFrameRead(FrameSlot slot) {
-        throw new UnsupportedOperationException();
+        return new DefaultReadFrameNode(slot);
     }
 
     @Override
