@@ -44,6 +44,8 @@ import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.FrameInstanceVisitor;
+import com.oracle.truffle.api.frame.FrameRead;
+import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.DirectCallNode;
@@ -87,6 +89,8 @@ public interface TruffleRuntime {
      * @since 0.8 or earlier
      */
     DirectCallNode createDirectCallNode(CallTarget target);
+
+    FrameRead createFrameRead(FrameSlot slot);
 
     /**
      * Creates a new loop node with an implementation provided by a Truffle runtime implementation.

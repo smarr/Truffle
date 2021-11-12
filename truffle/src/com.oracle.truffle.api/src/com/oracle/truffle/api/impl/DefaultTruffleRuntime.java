@@ -59,6 +59,8 @@ import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.FrameInstanceVisitor;
+import com.oracle.truffle.api.frame.FrameRead;
+import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.DirectCallNode;
@@ -134,6 +136,11 @@ public final class DefaultTruffleRuntime implements TruffleRuntime {
     @Override
     public IndirectCallNode createIndirectCallNode() {
         return new DefaultIndirectCallNode();
+    }
+
+    @Override
+    public FrameRead createFrameRead(FrameSlot slot) {
+        throw new UnsupportedOperationException();
     }
 
     @Override
