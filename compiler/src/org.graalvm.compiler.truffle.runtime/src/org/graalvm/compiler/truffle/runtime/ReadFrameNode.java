@@ -13,10 +13,13 @@ import sun.misc.Unsafe;
 
 public final class ReadFrameNode extends Node implements FrameRead {
     private final FrameSlot slot;
+    private final Object uninitializedValue;
+
     @CompilationFinal private int state;
 
-    ReadFrameNode(FrameSlot slot) {
+    ReadFrameNode(FrameSlot slot, Object uninitializedValue) {
         this.slot = slot;
+        this.uninitializedValue = uninitializedValue;
     }
 
     @Override
@@ -31,10 +34,19 @@ public final class ReadFrameNode extends Node implements FrameRead {
         try {
             tag = cachedTags[frameSlotIndex];
         } catch (ArrayIndexOutOfBoundsException e) {
-            tag = frame.resizeAndGetTags()[frameSlotIndex];
+            frame.resize();
+            cachedTags = frame.getTags();
+            tag = cachedTags[frameSlotIndex];
         }
 
-        if ((state & 0b1) != 0 /* is-state_0 readBoolean(Frame) */) {
+        if ((state & 0b1) != 0 /* uninitialized */) {
+            boolean condition = tag == FrameWithoutBoxing.ILLEGAL_TAG;
+            if (condition) {
+                return uninitializedValue;
+            }
+        }
+
+        if ((state & 0b10) != 0 /* is-state_0 readBoolean(Frame) */) {
             boolean condition = tag == FrameWithoutBoxing.BOOLEAN_TAG;
             if (condition) {
                 long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
@@ -42,14 +54,7 @@ public final class ReadFrameNode extends Node implements FrameRead {
                 return FrameWithoutBoxing.unsafeGetInt(primitiveLocals, offset, condition, slot) != 0;
             }
         }
-        if ((state & 0b10) != 0 /* is-state_0 readInt(Frame) */) {
-            boolean condition = tag == FrameWithoutBoxing.INT_TAG;
-            if (condition) {
-                long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
-                long[] primitiveLocals = frame.getPrimitiveLocals();
-                return FrameWithoutBoxing.unsafeGetInt(primitiveLocals, offset, condition, slot);
-            }
-        }
+
         if ((state & 0b100) != 0 /* is-state_0 readLong(Frame) */) {
             boolean condition = tag == FrameWithoutBoxing.LONG_TAG;
             if (condition) {
@@ -87,23 +92,23 @@ public final class ReadFrameNode extends Node implements FrameRead {
         try {
             tag = cachedTags[frameSlotIndex];
         } catch (ArrayIndexOutOfBoundsException e) {
-            tag = frame.resizeAndGetTags()[frameSlotIndex];
+            frame.resize();
+            cachedTags = frame.getTags();
+            tag = cachedTags[frameSlotIndex];
         }
 
-        boolean condition = tag == FrameWithoutBoxing.BOOLEAN_TAG;
+        boolean condition = tag == FrameWithoutBoxing.ILLEGAL_TAG;
         if (condition) {
-            this.state = state = state | 0b1 /* add-state_0 readBoolean(Frame) */;
+            this.state = state = state | 0b1 /* add-state_0 readInt(Frame) */;
+            return uninitializedValue;
+        }
+
+        condition = tag == FrameWithoutBoxing.BOOLEAN_TAG;
+        if (condition) {
+            this.state = state = state | 0b10 /* add-state_0 readBoolean(Frame) */;
             long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
             long[] primitiveLocals = frame.getPrimitiveLocals();
             return FrameWithoutBoxing.unsafeGetInt(primitiveLocals, offset, condition, slot) != 0;
-        }
-
-        condition = tag == FrameWithoutBoxing.INT_TAG;
-        if (condition) {
-            this.state = state = state | 0b10 /* add-state_0 readInt(Frame) */;
-            long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
-            long[] primitiveLocals = frame.getPrimitiveLocals();
-            return FrameWithoutBoxing.unsafeGetInt(primitiveLocals, offset, condition, slot);
         }
 
         condition = tag == FrameWithoutBoxing.LONG_TAG;
