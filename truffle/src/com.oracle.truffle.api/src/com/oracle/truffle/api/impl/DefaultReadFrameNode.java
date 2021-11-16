@@ -9,7 +9,7 @@ import com.oracle.truffle.api.nodes.NodeCost;
 public final class DefaultReadFrameNode extends Node implements FrameRead {
     private final FrameSlot slot;
 
-    DefaultReadFrameNode(FrameSlot slot) {
+    DefaultReadFrameNode(FrameSlot slot, Object uninitializedValue) {
         this.slot = slot;
     }
 

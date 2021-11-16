@@ -137,8 +137,8 @@ public final class DefaultTruffleRuntime implements TruffleRuntime {
     }
 
     @Override
-    public FrameRead createFrameRead(FrameSlot slot) {
-        return new DefaultReadFrameNode(slot);
+    public FrameRead createFrameRead(FrameSlot slot, Object uninitializedValue) {
+        return new DefaultReadFrameNode(slot, uninitializedValue);
     }
 
     @Override

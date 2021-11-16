@@ -94,7 +94,7 @@ public interface TruffleRuntime {
      */
     DirectCallNode createDirectCallNode(CallTarget target);
 
-    FrameRead createFrameRead(FrameSlot slot);
+    FrameRead createFrameRead(FrameSlot slot, Object uninitializedValue);
 
     /**
      * Creates a new loop node with an implementation provided by a Truffle runtime implementation.

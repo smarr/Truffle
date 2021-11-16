@@ -488,8 +488,8 @@ public abstract class GraalTruffleRuntime implements TruffleRuntime, TruffleComp
     }
 
     @Override
-    public FrameRead createFrameRead(FrameSlot slot) {
-        return new ReadFrameNode(slot);
+    public FrameRead createFrameRead(FrameSlot slot, Object uninitializedValue) {
+        return new ReadFrameNode(slot, uninitializedValue);
     }
 
     @Override
