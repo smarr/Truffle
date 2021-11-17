@@ -59,11 +59,11 @@ import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.FrameInstanceVisitor;
-import com.oracle.truffle.api.frame.FrameRead;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.DirectCallNode;
+import com.oracle.truffle.api.nodes.ExecuteNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
@@ -139,7 +139,7 @@ public final class DefaultTruffleRuntime implements TruffleRuntime {
     }
 
     @Override
-    public FrameRead createFrameRead(FrameSlot slot, Object uninitializedValue) {
+    public ExecuteNode createFrameRead(FrameSlot slot, Object uninitializedValue) {
         return new DefaultReadFrameNode(slot, uninitializedValue);
     }
 

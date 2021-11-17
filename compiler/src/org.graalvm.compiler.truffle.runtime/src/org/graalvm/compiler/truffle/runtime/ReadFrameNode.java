@@ -4,14 +4,16 @@ import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.dsl.UnsupportedSpecializationException;
 import com.oracle.truffle.api.frame.Frame;
-import com.oracle.truffle.api.frame.FrameRead;
 import com.oracle.truffle.api.frame.FrameSlot;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.nodes.ExecuteNode;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.NodeCost;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 import sun.misc.Unsafe;
 
-public final class ReadFrameNode extends Node implements FrameRead {
+public final class ReadFrameNode extends ExecuteNode {
     private final FrameSlot slot;
     private final Object uninitializedValue;
 
@@ -23,7 +25,109 @@ public final class ReadFrameNode extends Node implements FrameRead {
     }
 
     @Override
-    public Object executeRead(Frame frameValue) {
+    public boolean executeBoolean(VirtualFrame frameValue) throws UnexpectedResultException {
+        int state = this.state;
+
+        if ((state & 0b10) != 0 /* is-state_0 doBoolean(VirtualFrame) */) {
+            FrameWithoutBoxing frame = (FrameWithoutBoxing) frameValue;
+            int frameSlotIndex = slot.getIndex();
+            byte tag;
+
+            byte[] cachedTags = frame.getTags();
+            try {
+                tag = cachedTags[frameSlotIndex];
+            } catch (ArrayIndexOutOfBoundsException e) {
+                frame.resize();
+                cachedTags = frame.getTags();
+                tag = cachedTags[frameSlotIndex];
+            }
+
+            boolean condition = tag == FrameWithoutBoxing.BOOLEAN_TAG;
+            if (condition) {
+                long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
+                long[] primitiveLocals = frame.getPrimitiveLocals();
+                return FrameWithoutBoxing.unsafeGetInt(primitiveLocals, offset, condition, slot) != 0;
+            }
+        }
+        CompilerDirectives.transferToInterpreterAndInvalidate();
+        Object value = executeAndSpecialize(frameValue);
+        if (value instanceof Boolean) {
+            return (boolean) value;
+        }
+
+        throw new UnexpectedResultException(value);
+    }
+
+    @Override
+    public long executeLong(VirtualFrame frameValue) throws UnexpectedResultException {
+        int state = this.state;
+
+        if ((state & 0b100) != 0 /* is-state_0 readLong(Frame) */) {
+            FrameWithoutBoxing frame = (FrameWithoutBoxing) frameValue;
+            int frameSlotIndex = slot.getIndex();
+            byte tag;
+
+            byte[] cachedTags = frame.getTags();
+            try {
+                tag = cachedTags[frameSlotIndex];
+            } catch (ArrayIndexOutOfBoundsException e) {
+                frame.resize();
+                cachedTags = frame.getTags();
+                tag = cachedTags[frameSlotIndex];
+            }
+
+            boolean condition = tag == FrameWithoutBoxing.LONG_TAG;
+            if (condition) {
+                long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
+                long[] primitiveLocals = frame.getPrimitiveLocals();
+                return FrameWithoutBoxing.unsafeGetLong(primitiveLocals, offset, condition, slot);
+            }
+        }
+        CompilerDirectives.transferToInterpreterAndInvalidate();
+        Object value = executeAndSpecialize(frameValue);
+        if (value instanceof Long) {
+            return (long) value;
+        }
+
+        throw new UnexpectedResultException(value);
+    }
+
+    @Override
+    public double executeDouble(VirtualFrame frameValue) throws UnexpectedResultException {
+        int state = this.state;
+
+        if ((state & 0b1000) != 0 /* is-state_0 readDouble(Frame) */) {
+            FrameWithoutBoxing frame = (FrameWithoutBoxing) frameValue;
+            int frameSlotIndex = slot.getIndex();
+            byte tag;
+
+            byte[] cachedTags = frame.getTags();
+            try {
+                tag = cachedTags[frameSlotIndex];
+            } catch (ArrayIndexOutOfBoundsException e) {
+                frame.resize();
+                cachedTags = frame.getTags();
+                tag = cachedTags[frameSlotIndex];
+            }
+
+            boolean condition = tag == FrameWithoutBoxing.DOUBLE_TAG;
+            if (condition) {
+                long offset = Unsafe.ARRAY_LONG_BASE_OFFSET + frameSlotIndex * (long) Unsafe.ARRAY_LONG_INDEX_SCALE;
+                long[] primitiveLocals = frame.getPrimitiveLocals();
+                return FrameWithoutBoxing.unsafeGetDouble(primitiveLocals, offset, condition, slot);
+            }
+        }
+        CompilerDirectives.transferToInterpreterAndInvalidate();
+        Object value = executeAndSpecialize(frameValue);
+        if (value instanceof Double) {
+            return (double) value;
+        }
+
+        throw new UnexpectedResultException(value);
+    }
+
+    @Override
+    public Object executeGeneric(VirtualFrame frameValue) {
         FrameWithoutBoxing frame = (FrameWithoutBoxing) frameValue;
 
         int state = this.state;

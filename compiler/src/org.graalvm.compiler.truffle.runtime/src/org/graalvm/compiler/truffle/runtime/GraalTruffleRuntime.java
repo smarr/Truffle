@@ -99,7 +99,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.FrameInstanceVisitor;
-import com.oracle.truffle.api.frame.FrameRead;
+import com.oracle.truffle.api.nodes.ExecuteNode;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.MaterializedFrame;
@@ -488,7 +488,7 @@ public abstract class GraalTruffleRuntime implements TruffleRuntime, TruffleComp
     }
 
     @Override
-    public FrameRead createFrameRead(FrameSlot slot, Object uninitializedValue) {
+    public ExecuteNode createFrameRead(FrameSlot slot, Object uninitializedValue) {
         return new ReadFrameNode(slot, uninitializedValue);
     }
 
