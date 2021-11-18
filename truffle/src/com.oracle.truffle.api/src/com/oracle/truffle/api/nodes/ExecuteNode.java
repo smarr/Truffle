@@ -5,6 +5,10 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 public abstract class ExecuteNode extends Node {
     public abstract Object executeGeneric(VirtualFrame frame);
 
+    public ExecuteNode getChild1() {
+        return null;
+    }
+
     public boolean executeBoolean(final VirtualFrame frame) throws UnexpectedResultException {
         Object value = executeGeneric(frame);
         if (value instanceof Boolean) {

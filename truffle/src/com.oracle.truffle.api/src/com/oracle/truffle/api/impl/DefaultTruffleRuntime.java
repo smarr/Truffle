@@ -144,6 +144,11 @@ public final class DefaultTruffleRuntime implements TruffleRuntime {
     }
 
     @Override
+    public ExecuteNode createFrameWrite(FrameSlot slot, ExecuteNode valueExp) {
+        return new DefaultWriteFrameNode(slot, valueExp);
+    }
+
+    @Override
     public VirtualFrame createVirtualFrame(Object[] arguments, FrameDescriptor frameDescriptor) {
         return new DefaultVirtualFrame(frameDescriptor, arguments);
     }

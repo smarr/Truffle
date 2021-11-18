@@ -493,6 +493,11 @@ public abstract class GraalTruffleRuntime implements TruffleRuntime, TruffleComp
     }
 
     @Override
+    public ExecuteNode createFrameWrite(FrameSlot slot, ExecuteNode valueExp) {
+        return new WriteFrameNode(slot, valueExp);
+    }
+
+    @Override
     public DirectCallNode createDirectCallNode(CallTarget target) {
         if (target instanceof OptimizedCallTarget) {
             OptimizedCallTarget optimizedTarget = (OptimizedCallTarget) target;

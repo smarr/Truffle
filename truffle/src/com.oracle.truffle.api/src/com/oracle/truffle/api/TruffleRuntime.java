@@ -92,6 +92,8 @@ public interface TruffleRuntime {
 
     ExecuteNode createFrameRead(FrameSlot slot, Object uninitializedValue);
 
+    ExecuteNode createFrameWrite(FrameSlot slot, ExecuteNode valueExp);
+
     /**
      * Creates a new loop node with an implementation provided by a Truffle runtime implementation.
      * Using Truffle loop nodes allows the runtime to do additional optimizations such as on stack

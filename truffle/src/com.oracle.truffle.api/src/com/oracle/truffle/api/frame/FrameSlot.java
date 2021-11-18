@@ -60,7 +60,7 @@ public final class FrameSlot implements Cloneable {
      * require locking the FrameDescriptor, instead of current simple read from the volatile kind
      * field.
      */
-    @CompilationFinal volatile FrameSlotKind kind;
+    public @CompilationFinal volatile FrameSlotKind kind;
 
     FrameSlot(FrameDescriptor descriptor, Object identifier, Object info, FrameSlotKind kind, int index) {
         this.descriptor = descriptor;

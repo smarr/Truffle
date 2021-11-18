@@ -469,12 +469,12 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
     }
 
     @SuppressWarnings("unused")
-    private static void unsafePutInt(Object receiver, long offset, int value, Object locationIdentity) {
+    static void unsafePutInt(Object receiver, long offset, int value, Object locationIdentity) {
         UNSAFE.putInt(receiver, offset, value);
     }
 
     @SuppressWarnings("unused")
-    private static void unsafePutLong(Object receiver, long offset, long value, Object locationIdentity) {
+    static void unsafePutLong(Object receiver, long offset, long value, Object locationIdentity) {
         UNSAFE.putLong(receiver, offset, value);
     }
 
