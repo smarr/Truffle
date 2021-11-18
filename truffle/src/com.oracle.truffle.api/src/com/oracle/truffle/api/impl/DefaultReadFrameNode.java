@@ -36,7 +36,7 @@ public final class DefaultReadFrameNode extends ExecuteNode {
     @Override
     public long executeLong(VirtualFrame frame) throws UnexpectedResultException {
         Object value = frame.getValue(slot);
-        if (value instanceof Boolean) {
+        if (value instanceof Long) {
             return (long) value;
         }
 
@@ -46,7 +46,7 @@ public final class DefaultReadFrameNode extends ExecuteNode {
     @Override
     public double executeDouble(VirtualFrame frame) throws UnexpectedResultException {
         Object value = frame.getValue(slot);
-        if (value instanceof Boolean) {
+        if (value instanceof Double) {
             return (double) value;
         }
 
