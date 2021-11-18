@@ -121,7 +121,7 @@ public final class WriteFrameNode extends ExecuteNode {
         }
 
         CompilerDirectives.transferToInterpreterAndInvalidate();
-        Object result = executeAndSpecialize(frame, expObjectValue);
+        Object result = writeAndSpecialize(frame, expObjectValue);
         if (result instanceof Boolean) {
             return (boolean) result;
         }
@@ -166,7 +166,7 @@ public final class WriteFrameNode extends ExecuteNode {
         }
 
         CompilerDirectives.transferToInterpreterAndInvalidate();
-        Object result = executeAndSpecialize(frame, expObjectValue);
+        Object result = writeAndSpecialize(frame, expObjectValue);
         if (result instanceof Long) {
             return (long) result;
         }
@@ -211,14 +211,14 @@ public final class WriteFrameNode extends ExecuteNode {
         }
 
         CompilerDirectives.transferToInterpreterAndInvalidate();
-        Object result = executeAndSpecialize(frame, expObjectValue);
+        Object result = writeAndSpecialize(frame, expObjectValue);
         if (result instanceof Double) {
             return (double) result;
         }
         throw new UnexpectedResultException(result);
     }
 
-    private Object executeAndSpecialize(VirtualFrame frameValue, Object expValue) {
+    private Object writeAndSpecialize(VirtualFrame frameValue, Object expValue) {
         // This should only be called when we can actually still specialize anything
         assert (state & 0b1000) == 0;
         int state = this.state;
@@ -309,7 +309,7 @@ public final class WriteFrameNode extends ExecuteNode {
     @Override
     public Object executeGeneric(VirtualFrame frame) {
         int state = this.state;
-        /* only-active writeBoolean */
+
         try {
             if (state == 0b1) {
                 return executeBooleanState(frame, state);
@@ -323,7 +323,14 @@ public final class WriteFrameNode extends ExecuteNode {
         }
 
         Object expValue = exp.executeGeneric(frame);
+        if (state == 0b1000) {
+            return writeGeneric(frame, expValue);
+        }
 
+        return attemptActiveStatesOrSpecialize(frame, state, expValue);
+    }
+
+    public Object attemptActiveStatesOrSpecialize(VirtualFrame frame, int state, Object expValue) {
         if ((state & 0b1) != 0 && expValue instanceof Boolean) {
             boolean expBoolValue = (boolean) expValue;
             FrameSlotKind kind = slot.kind;
@@ -375,11 +382,7 @@ public final class WriteFrameNode extends ExecuteNode {
             }
         }
 
-        if (state == 0b1000) {
-            return writeGeneric(frame, expValue);
-        }
-
-        return executeAndSpecialize(frame, expValue);
+        return writeAndSpecialize(frame, expValue);
     }
 
 }
