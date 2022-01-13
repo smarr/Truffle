@@ -8,27 +8,36 @@ public class AssumptionGroup implements Assumption {
 
     private long allValidAtEpoch;
 
+    public static Assumption create(Assumption[] assumptions) {
+        assert noNullAssumptions(assumptions);
+        if (assumptions.length == 1) {
+            return assumptions[0];
+        }
+        return new AssumptionGroup(assumptions);
+    }
+
+    private static boolean noNullAssumptions(Assumption[] assumptions) {
+        for (Assumption a : assumptions) {
+            if (a == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     @CompilerDirectives.CompilationFinal(dimensions = 1)
     private final Assumption[] assumptions;
 
-    public AssumptionGroup(Assumption[] assumptions) {
+    private AssumptionGroup(Assumption[] assumptions) {
         this.assumptions = assumptions;
-        assert noNullAssumptions();
+
         if (isValidWithoutEpoch()) {
             allValidAtEpoch = globalEpoch;
         }
         assert isValid();
     }
 
-    private boolean noNullAssumptions() {
-        for (Assumption a : assumptions) {
-            if (a == null) {
-                return false;
-            }
-        }
 
-        return true;
-    }
 
     @Override
     @ExplodeLoop
