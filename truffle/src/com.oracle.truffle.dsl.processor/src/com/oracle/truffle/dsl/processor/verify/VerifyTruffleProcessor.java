@@ -131,31 +131,34 @@ public class VerifyTruffleProcessor extends AbstractProcessor {
         ProcessorContext context = ProcessorContext.enter(processingEnv);
         try {
             TruffleTypes types = context.getTypes();
-            TypeElement virtualFrameType = ElementUtils.castTypeElement(types.VirtualFrame);
+// TypeElement virtualFrameType = ElementUtils.castTypeElement(types.VirtualFrame);
 
-            for (Element element : roundEnv.getElementsAnnotatedWith(ElementUtils.castTypeElement(types.CompilerDirectives_TruffleBoundary))) {
-                scope = element;
-                try {
-                    if (element.getKind() != ElementKind.CONSTRUCTOR &&
-                                    element.getKind() != ElementKind.METHOD) {
-                        continue;
-                    }
-                    ExecutableElement method = (ExecutableElement) element;
-
-                    for (VariableElement parameter : method.getParameters()) {
-                        Element paramType = processingEnv.getTypeUtils().asElement(parameter.asType());
-                        if (paramType != null && paramType.equals(virtualFrameType)) {
-                            errorMessage(element, "Method %s cannot be annotated with @%s and have a parameter of type %s", method.getSimpleName(),
-                                            types.CompilerDirectives_TruffleBoundary.asElement().getSimpleName().toString(),
-                                            paramType.getSimpleName());
-                        }
-                    }
-                } catch (Throwable t) {
-                    reportException(isBug367599(t) ? Kind.NOTE : Kind.ERROR, element, t);
-                } finally {
-                    scope = null;
-                }
-            }
+// for (Element element :
+// roundEnv.getElementsAnnotatedWith(ElementUtils.castTypeElement(types.CompilerDirectives_TruffleBoundary)))
+// {
+// scope = element;
+// try {
+// if (element.getKind() != ElementKind.CONSTRUCTOR &&
+// element.getKind() != ElementKind.METHOD) {
+// continue;
+// }
+// ExecutableElement method = (ExecutableElement) element;
+//
+// for (VariableElement parameter : method.getParameters()) {
+// Element paramType = processingEnv.getTypeUtils().asElement(parameter.asType());
+// if (paramType != null && paramType.equals(virtualFrameType)) {
+// errorMessage(element, "Method %s cannot be annotated with @%s and have a parameter of type %s",
+// method.getSimpleName(),
+// types.CompilerDirectives_TruffleBoundary.asElement().getSimpleName().toString(),
+// paramType.getSimpleName());
+// }
+// }
+// } catch (Throwable t) {
+// reportException(isBug367599(t) ? Kind.NOTE : Kind.ERROR, element, t);
+// } finally {
+// scope = null;
+// }
+// }
 
             TypeElement nodeType = ElementUtils.castTypeElement(types.Node);
             TypeElement nodeInterfaceType = ElementUtils.castTypeElement(types.NodeInterface);

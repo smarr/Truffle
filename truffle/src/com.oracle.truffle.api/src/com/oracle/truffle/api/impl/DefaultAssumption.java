@@ -41,6 +41,7 @@
 package com.oracle.truffle.api.impl;
 
 import com.oracle.truffle.api.Assumption;
+import com.oracle.truffle.api.AssumptionGroup;
 import com.oracle.truffle.api.TruffleRuntime;
 import com.oracle.truffle.api.nodes.InvalidAssumptionException;
 
@@ -68,6 +69,9 @@ final class DefaultAssumption extends AbstractAssumption {
 
     @Override
     public void invalidate(String message) {
+        if (isValid) {
+            AssumptionGroup.notifyOfInvalidation();
+        }
         isValid = false;
     }
 
