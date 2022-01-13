@@ -41,6 +41,8 @@ public class AssumptionGroup implements Assumption {
         for (Assumption a : assumptions) {
             a.check();
         }
+
+        allValidAtEpoch = globalEpoch;
     }
 
     @Override
@@ -61,6 +63,8 @@ public class AssumptionGroup implements Assumption {
                 return false;
             }
         }
+
+        allValidAtEpoch = globalEpoch;
         return true;
     }
 
