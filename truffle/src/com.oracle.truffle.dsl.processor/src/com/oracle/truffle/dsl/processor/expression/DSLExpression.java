@@ -145,6 +145,14 @@ public abstract class DSLExpression {
         return mayAllocate.get();
     }
 
+    public boolean isTrivialFieldReference() {
+        return false;
+    }
+
+    public String getFieldNameOfTrivialReference() {
+        return null;
+    }
+
     public boolean isNodeReceiverBound() {
         final AtomicBoolean bindsReceiver = new AtomicBoolean(false);
         accept(new AbstractDSLExpressionVisitor() {
@@ -703,6 +711,25 @@ public abstract class DSLExpression {
 
         public VariableElement getResolvedVariable() {
             return resolvedVariable;
+        }
+
+        @Override
+        public boolean isTrivialFieldReference() {
+            // if the receiver is != null, this isn't a direct field reference
+            // Note: this might be overly cautious, one could possibly support field.field.field
+            // chains. Though, then there would be a performance and semantics question
+            // around mutability etc.
+            return receiver == null &&
+                            resolvedVariable != null &&
+                            resolvedVariable.getKind() == ElementKind.FIELD;
+        }
+
+        @Override
+        public String getFieldNameOfTrivialReference() {
+            if (isTrivialFieldReference()) {
+                return name;
+            }
+            return null;
         }
 
         @Override
