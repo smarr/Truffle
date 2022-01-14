@@ -82,4 +82,11 @@ public final class AssumptionExpression extends MessageContainer {
         return expression;
     }
 
+    public boolean isTrivialFieldReference() {
+        return expression.isTrivialFieldReference();
+    }
+
+    public String getFieldNameOfTrivialReference() {
+        return expression.getFieldNameOfTrivialReference();
+    }
 }
