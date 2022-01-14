@@ -28,6 +28,7 @@ import java.lang.ref.WeakReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
+import com.oracle.truffle.api.AssumptionGroup;
 import org.graalvm.compiler.truffle.common.OptimizedAssumptionDependency;
 import org.graalvm.compiler.truffle.options.PolyglotCompilerOptions;
 import org.graalvm.options.OptionValues;
@@ -168,6 +169,8 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
         if (!isValid) {
             return;
         }
+
+        AssumptionGroup.notifyOfInvalidation();
 
         OptionValues engineOptions = null;
         TruffleLogger logger = null;
