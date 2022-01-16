@@ -8,6 +8,43 @@ public class AssumptionGroup implements Assumption {
 
     private long allValidAtEpoch;
 
+    public static Assumption createFromAssumptions(Object... assumptions) {
+        if (assumptions.length == 1) {
+            assert assumptions[0].getClass() == Assumption[].class : "The DSL has a bug, we should not call this if this isn't an array.";
+            return create((Assumption[]) assumptions);
+        }
+
+        int numAssumptions = 0;
+        for (Object a : assumptions) {
+            if (a.getClass() == Assumption[].class) {
+                Assumption[] as = (Assumption[]) a;
+                numAssumptions += as.length;
+            } else {
+                numAssumptions += 1;
+            }
+        }
+
+        Assumption[] aArray = new Assumption[numAssumptions];
+
+        int i = 0;
+        for (Object a : assumptions) {
+            if (a.getClass() == Assumption[].class) {
+                Assumption[] as = (Assumption[]) a;
+
+                for (Assumption aa : as) {
+                    aArray[i] = aa;
+                    i += 1;
+                }
+
+            } else {
+                aArray[i] = (Assumption) a;
+                i += 1;
+            }
+        }
+
+        return create(aArray);
+    }
+
     public static Assumption create(Assumption[] assumptions) {
         assert noNullAssumptions(assumptions);
         if (assumptions.length == 1) {
@@ -25,8 +62,7 @@ public class AssumptionGroup implements Assumption {
         return true;
     }
 
-    @CompilerDirectives.CompilationFinal(dimensions = 1)
-    private final Assumption[] assumptions;
+    @CompilerDirectives.CompilationFinal(dimensions = 1) private final Assumption[] assumptions;
 
     private AssumptionGroup(Assumption[] assumptions) {
         this.assumptions = assumptions;

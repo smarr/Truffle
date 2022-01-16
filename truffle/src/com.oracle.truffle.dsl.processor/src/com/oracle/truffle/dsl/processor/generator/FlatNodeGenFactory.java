@@ -92,7 +92,6 @@ import java.util.function.Function;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -411,16 +410,20 @@ public class FlatNodeGenFactory {
         return name;
     }
 
-    private String createAssumptionFieldName(SpecializationData specialization, AssumptionExpression assumption) {
-        if (assumption.isTrivialFieldReference()) {
-            return assumption.getFieldNameOfTrivialReference();
+    private String createAssumptionFieldName(SpecializationData specialization) {
+        return specialization.getAssumptionGroupFieldName(useSpecializationClass(specialization));
+    }
+
+    private String createAssumptionTempVarName(SpecializationData specialization, AssumptionExpression assumption) {
+        String name;
+        if (useSpecializationClass(specialization)) {
+            name = assumption.getId() + "_";
+        } else {
+            name = firstLetterLowerCase(specialization.getId()) + "_" + assumption.getId() + "_";
         }
 
-        if (useSpecializationClass(specialization)) {
-            return assumption.getId() + "_";
-        } else {
-            return firstLetterLowerCase(specialization.getId()) + "_" + assumption.getId() + "_";
-        }
+        name += "_";
+        return name;
     }
 
     private static String createSpecializationLocalName(SpecializationData s) {
@@ -1294,8 +1297,8 @@ public class FlatNodeGenFactory {
                 fields.add(cachedField);
             }
 
-            for (AssumptionExpression assumption : specialization.getAssumptionExpressions()) {
-                createAssumptionField(specialization, fields, useSpecializationClass, assumption);
+            if (specialization.hasAssumptions()) {
+                createAssumptionField(specialization, fields, useSpecializationClass);
             }
 
             if (useSpecializationClass) {
@@ -1351,21 +1354,15 @@ public class FlatNodeGenFactory {
         generateStatisticsFields(clazz);
     }
 
-    public void createAssumptionField(SpecializationData specialization, List<CodeVariableElement> fields, boolean useSpecializationClass, AssumptionExpression assumption) {
-        if (assumption.isTrivialFieldReference()) {
+    public void createAssumptionField(SpecializationData specialization, List<CodeVariableElement> fields, boolean useSpecializationClass) {
+        if (specialization.isAssumptionFieldRedundant()) {
             return;
         }
 
-        String fieldName = createAssumptionFieldName(specialization, assumption);
-        TypeMirror type;
-        int compilationFinalDimensions;
-        if (assumption.getExpression().getResolvedType().getKind() == TypeKind.ARRAY) {
-            type = new ArrayCodeTypeMirror(types.Assumption);
-            compilationFinalDimensions = 1;
-        } else {
-            type = types.Assumption;
-            compilationFinalDimensions = -1;
-        }
+        String fieldName = createAssumptionFieldName(specialization);
+        TypeMirror type = types.Assumption;
+        int compilationFinalDimensions = -1;
+
         CodeVariableElement assumptionField;
         if (useSpecializationClass) {
             assumptionField = createNodeField(null, type, fieldName, null);
@@ -4022,7 +4019,7 @@ public class FlatNodeGenFactory {
                 prepare = builder.build();
                 assumptionReference = CodeTreeBuilder.singleString(localName);
             } else {
-                assumptionReference = createAssumptionReference(frameState, specialization, assumption);
+                assumptionReference = createAssumptionReference(frameState, specialization);
             }
 
             CodeTree assumptionGuard = createAssumptionGuard(assumptionReference);
@@ -4051,15 +4048,15 @@ public class FlatNodeGenFactory {
         List<IfTriple> triples = new ArrayList<>();
 
         if (assumption.isTrivialFieldReference()) {
-            triples.add(new IfTriple(null, createAssumptionGuard(createAssumptionReference(frameState, group.getSpecialization(), assumption)), null));
+            triples.add(new IfTriple(null, createAssumptionGuard(createAssumptionReference(frameState, group.getSpecialization())), null));
         } else {
             LocalVariable var = frameState.get(assumption.getId());
             CodeTree declaration = null;
             if (var == null) {
                 triples.addAll(initializeCaches(frameState, frameState.getMode(), group, group.getSpecialization().getBoundCaches(assumption.getExpression(), true), true, false));
                 CodeTree assumptionExpressions = writeExpression(frameState, group.getSpecialization(), assumption.getExpression());
-                String name = createAssumptionFieldName(group.getSpecialization(), assumption);
-                var = new LocalVariable(assumption.getExpression().getResolvedType(), name.substring(0, name.length() - 1), null);
+                String name = createAssumptionTempVarName(group.getSpecialization(), assumption);
+                var = new LocalVariable(assumption.getExpression().getResolvedType(), name, null);
                 frameState.set(assumption.getId(), var);
                 declaration = var.createDeclaration(assumptionExpressions);
             }
@@ -4191,19 +4188,64 @@ public class FlatNodeGenFactory {
 
     private List<IfTriple> persistAssumptions(FrameState frameState, SpecializationData specialization) {
         List<IfTriple> triples = new ArrayList<>();
-        for (AssumptionExpression assumption : specialization.getAssumptionExpressions()) {
-            if (assumption.isTrivialFieldReference()) {
-                continue;
+
+        if (!specialization.hasAssumptions()) {
+            return triples;
+        }
+
+        AssumptionExpression firstAssumption = specialization.getFirstAssumption();
+        LocalVariable assumptionVar = frameState.get(firstAssumption.getId());
+        String assumptionName = createAssumptionFieldName(specialization);
+
+        if (!specialization.isAssumptionGroup()) {
+            if (firstAssumption.isTrivialFieldReference()) {
+                return triples;
             }
 
-            LocalVariable var = frameState.get(assumption.getId());
-            String name = createAssumptionFieldName(specialization, assumption);
             CodeTreeBuilder builder = new CodeTreeBuilder(null);
             builder.startStatement();
-            builder.tree(createSpecializationFieldReference(frameState, specialization, name, false)).string(" = ").tree(var.createReference());
+            builder.tree(createSpecializationFieldReference(frameState, specialization, assumptionName, false));
+            builder.string(" = ");
+            builder.tree(assumptionVar.createReference());
             builder.end();
             triples.add(new IfTriple(builder.build(), null, null));
+
+            return triples;
         }
+
+        CodeTreeBuilder builder = new CodeTreeBuilder(null);
+
+        builder.startStatement();
+        builder.tree(createSpecializationFieldReference(frameState, specialization, assumptionName, false));
+        builder.string(" = ");
+
+        CodeTreeBuilder argumentsBuilder = builder.startStaticCall(types.AssumptionGroup, "createFromAssumptions");
+
+        List<AssumptionExpression> assumptions = specialization.getAssumptionExpressions();
+        for (AssumptionExpression assumption : assumptions) {
+            LocalVariable var = frameState.get(assumption.getId());
+
+            if (assumptions.size() == 1) {
+                // this implies it must be an array
+                assert assumption.isAssumptionArray();
+                if (assumption.isTrivialFieldReference()) {
+                    argumentsBuilder.startGroup().string("(Object[]) this." + assumption.getFieldNameOfTrivialReference()).end();
+                } else {
+                    argumentsBuilder.startGroup().string("(Object[]) ").tree(var.createReference()).end();
+                }
+            } else {
+                if (assumption.isTrivialFieldReference()) {
+                    argumentsBuilder.string("this." + assumption.getFieldNameOfTrivialReference());
+                } else {
+                    argumentsBuilder.tree(var.createReference());
+                }
+            }
+        }
+
+        argumentsBuilder.end();
+        builder.end();
+        triples.add(new IfTriple(builder.build(), null, null));
+
         return triples;
     }
 
@@ -4370,13 +4412,13 @@ public class FlatNodeGenFactory {
                     throws AssertionError {
         CodeTreeBuilder builder = parent.create();
         builder.startIf();
-        String sep = "";
-        for (AssumptionExpression assumption : specialization.getAssumptionExpressions()) {
-            builder.string(sep);
-            builder.string("!");
-            builder.tree(createAssumptionGuard(createAssumptionReference(frameState, specialization, assumption)));
-            sep = " || ";
-        }
+
+        CodeTree assumptionRef = createAssumptionReference(frameState, specialization);
+        builder.tree(assumptionRef);
+        builder.string(" == null || !");
+        builder.tree(assumptionRef);
+        builder.string(".isValid()");
+
         builder.end().startBlock();
         builder.tree(createTransferToInterpreterAndInvalidate());
         builder.tree(createRemoveThis(builder, frameState, forType, specialization));
@@ -5187,9 +5229,9 @@ public class FlatNodeGenFactory {
         }
     }
 
-    private CodeTree createAssumptionReference(FrameState frameState, SpecializationData s, AssumptionExpression a) {
-        String assumptionFieldName = createAssumptionFieldName(s, a);
-        return createSpecializationFieldReference(frameState, s, assumptionFieldName, a.isTrivialFieldReference());
+    private CodeTree createAssumptionReference(FrameState frameState, SpecializationData s) {
+        String assumptionFieldName = createAssumptionFieldName(s);
+        return createSpecializationFieldReference(frameState, s, assumptionFieldName, s.isAssumptionFieldRedundant());
     }
 
     private IfTriple createTypeCheckOrCast(FrameState frameState, SpecializationGroup group, TypeGuard typeGuard,

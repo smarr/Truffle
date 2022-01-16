@@ -74,6 +74,7 @@ public class TruffleTypes {
 
     // Truffle API
     public static final String Assumption_Name = "com.oracle.truffle.api.Assumption";
+    public static final String AssumptionGroup_Name = "com.oracle.truffle.api.AssumptionGroup";
     public static final String CompilerAsserts_Name = "com.oracle.truffle.api.CompilerAsserts";
     public static final String CompilerDirectives_CompilationFinal_Name = "com.oracle.truffle.api.CompilerDirectives.CompilationFinal";
     public static final String CompilerDirectives_Name = "com.oracle.truffle.api.CompilerDirectives";
@@ -108,6 +109,7 @@ public class TruffleTypes {
     public static final String MemoryFence_Name = "com.oracle.truffle.api.memory.MemoryFence";
 
     public final DeclaredType Assumption = c.getDeclaredType(Assumption_Name);
+    public final DeclaredType AssumptionGroup = c.getDeclaredType(AssumptionGroup_Name);
     public final DeclaredType CompilerAsserts = c.getDeclaredType(CompilerAsserts_Name);
     public final DeclaredType CompilerDirectives = c.getDeclaredType(CompilerDirectives_Name);
     public final DeclaredType CompilerDirectives_CompilationFinal = c.getDeclaredType(CompilerDirectives_CompilationFinal_Name);
