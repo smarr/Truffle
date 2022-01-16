@@ -43,6 +43,7 @@ package com.oracle.truffle.dsl.processor.model;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.type.TypeKind;
 
 import com.oracle.truffle.dsl.processor.expression.DSLExpression;
 import com.oracle.truffle.dsl.processor.java.ElementUtils;
@@ -88,5 +89,9 @@ public final class AssumptionExpression extends MessageContainer {
 
     public String getFieldNameOfTrivialReference() {
         return expression.getFieldNameOfTrivialReference();
+    }
+
+    public boolean isAssumptionArray() {
+        return expression.getResolvedType().getKind() == TypeKind.ARRAY;
     }
 }

@@ -40,6 +40,8 @@
  */
 package com.oracle.truffle.dsl.processor.model;
 
+import static com.oracle.truffle.dsl.processor.java.ElementUtils.firstLetterLowerCase;
+
 import java.lang.ref.Reference;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -74,6 +76,7 @@ public final class SpecializationData extends TemplateMethod {
     private final boolean hasUnexpectedResultRewrite;
     private final List<GuardExpression> guards = new ArrayList<>();
     private List<CacheExpression> caches = Collections.emptyList();
+    private String assumptionGroupFieldName = null;
     private List<AssumptionExpression> assumptionExpressions = Collections.emptyList();
     private final Set<SpecializationData> replaces = new LinkedHashSet<>();
     private final Set<String> replacesNames = new LinkedHashSet<>();
@@ -107,6 +110,7 @@ public final class SpecializationData extends TemplateMethod {
         SpecializationData copy = new SpecializationData(node, this, kind, new ArrayList<>(exceptions), hasUnexpectedResultRewrite, reportPolymorphism, reportMegamorphism);
         copy.guards.addAll(guards);
         copy.caches = new ArrayList<>(caches);
+        copy.assumptionGroupFieldName = assumptionGroupFieldName;
         copy.assumptionExpressions = new ArrayList<>(assumptionExpressions);
         copy.replaced = replaced;
         copy.replaces.addAll(replaces);
@@ -601,6 +605,52 @@ public final class SpecializationData extends TemplateMethod {
 
     public List<AssumptionExpression> getAssumptionExpressions() {
         return assumptionExpressions;
+    }
+
+    public boolean isAssumptionGroup() {
+        if (assumptionExpressions.isEmpty()) {
+            return false;
+        }
+
+        return assumptionExpressions.size() > 1 || assumptionExpressions.get(0).isAssumptionArray();
+    }
+
+    public AssumptionExpression getFirstAssumption() {
+        if (assumptionExpressions.isEmpty()) {
+            return null;
+        }
+        return assumptionExpressions.get(0);
+    }
+
+    public boolean hasAssumptions() {
+        return !assumptionExpressions.isEmpty();
+    }
+
+    public boolean isAssumptionFieldRedundant() {
+        if (isAssumptionGroup()) {
+            return false;
+        }
+
+        return getFirstAssumption().isTrivialFieldReference();
+    }
+
+    public String getAssumptionGroupFieldName(boolean useSpecializationClass) {
+        if (assumptionGroupFieldName != null) {
+            return assumptionGroupFieldName;
+        }
+
+        AssumptionExpression first = getFirstAssumption();
+        if (!isAssumptionGroup() && first.isTrivialFieldReference()) {
+            assumptionGroupFieldName = first.getFieldNameOfTrivialReference();
+            return assumptionGroupFieldName;
+        }
+
+        if (useSpecializationClass) {
+            assumptionGroupFieldName = first.getId() + "_";
+        } else {
+            assumptionGroupFieldName = firstLetterLowerCase(getId()) + "_" + first.getId() + "_";
+        }
+        return assumptionGroupFieldName;
     }
 
     public boolean hasMultipleInstances() {
