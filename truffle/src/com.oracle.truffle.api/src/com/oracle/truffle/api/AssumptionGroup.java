@@ -8,6 +8,46 @@ public final class AssumptionGroup implements Assumption {
 
     private long allValidAtEpoch;
 
+    public static Assumption createFromAssumptions(Object... assumptions) {
+        if (assumptions.length == 1) {
+            if (assumptions[0].getClass() == Assumption[].class) {
+                return create((Assumption[]) assumptions[0]);
+            } else {
+                return (Assumption) assumptions[0];
+            }
+        }
+
+        int numAssumptions = 0;
+        for (Object a : assumptions) {
+            if (a.getClass() == Assumption[].class) {
+                Assumption[] as = (Assumption[]) a;
+                numAssumptions += as.length;
+            } else {
+                numAssumptions += 1;
+            }
+        }
+
+        Assumption[] aArray = new Assumption[numAssumptions];
+
+        int i = 0;
+        for (Object a : assumptions) {
+            if (a.getClass() == Assumption[].class) {
+                Assumption[] as = (Assumption[]) a;
+
+                for (Assumption aa : as) {
+                    aArray[i] = aa;
+                    i += 1;
+                }
+
+            } else {
+                aArray[i] = (Assumption) a;
+                i += 1;
+            }
+        }
+
+        return create(aArray);
+    }
+
     public static Assumption create(Assumption[] assumptions) {
         assert noNullAssumptions(assumptions);
         if (assumptions.length == 1) {
