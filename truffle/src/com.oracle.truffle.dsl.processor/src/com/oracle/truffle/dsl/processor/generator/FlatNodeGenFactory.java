@@ -828,7 +828,7 @@ public class FlatNodeGenFactory {
 
             List<IfTriple> tripples = new ArrayList<>();
             for (AssumptionExpression assumption : specialization.getAssumptionExpressions()) {
-                tripples.addAll(createAssumptionSlowPathTriples(innerFrameState, specializationGroup, assumption));
+                tripples.addAll(createAssumptionSlowPathTriples(specialization.isAssumptionGroup(), innerFrameState, specializationGroup, assumption));
             }
 
             /*
@@ -3795,7 +3795,7 @@ public class FlatNodeGenFactory {
                 List<AssumptionExpression> assumptions = specialization.getAssumptionExpressions();
                 if (!assumptions.isEmpty()) {
                     for (AssumptionExpression assumption : assumptions) {
-                        innerTripples.addAll(createAssumptionSlowPathTriples(innerFrameState, group, assumption));
+                        innerTripples.addAll(createAssumptionSlowPathTriples(specialization.isAssumptionGroup(), innerFrameState, group, assumption));
                     }
                 }
 
@@ -4044,10 +4044,10 @@ public class FlatNodeGenFactory {
                         castBoundTypes(bindExpressionValues(frameState, expression, specialization)));
     }
 
-    private List<IfTriple> createAssumptionSlowPathTriples(FrameState frameState, SpecializationGroup group, AssumptionExpression assumption) throws AssertionError {
+    private List<IfTriple> createAssumptionSlowPathTriples(boolean assumptionGroup, FrameState frameState, SpecializationGroup group, AssumptionExpression assumption) throws AssertionError {
         List<IfTriple> triples = new ArrayList<>();
 
-        if (assumption.isTrivialFieldReference()) {
+        if (!assumptionGroup && assumption.isTrivialFieldReference()) {
             triples.add(new IfTriple(null, createAssumptionGuard(createAssumptionReference(frameState, group.getSpecialization())), null));
         } else {
             LocalVariable var = frameState.get(assumption.getId());
@@ -4228,13 +4228,13 @@ public class FlatNodeGenFactory {
             if (assumptions.size() == 1) {
                 // this implies it must be an array
                 assert assumption.isAssumptionArray();
-                if (assumption.isTrivialFieldReference()) {
+                if (!specialization.isAssumptionGroup() && assumption.isTrivialFieldReference()) {
                     argumentsBuilder.startGroup().string("(Object[]) this." + assumption.getFieldNameOfTrivialReference()).end();
                 } else {
                     argumentsBuilder.startGroup().string("(Object[]) ").tree(var.createReference()).end();
                 }
             } else {
-                if (assumption.isTrivialFieldReference()) {
+                if (!specialization.isAssumptionGroup() && assumption.isTrivialFieldReference()) {
                     argumentsBuilder.string("this." + assumption.getFieldNameOfTrivialReference());
                 } else {
                     argumentsBuilder.tree(var.createReference());
