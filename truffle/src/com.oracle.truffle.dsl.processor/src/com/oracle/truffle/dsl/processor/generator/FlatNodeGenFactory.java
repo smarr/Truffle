@@ -4197,6 +4197,7 @@ public class FlatNodeGenFactory {
         LocalVariable assumptionVar = frameState.get(firstAssumption.getId());
         String assumptionName = createAssumptionFieldName(specialization);
 
+        // handle single assumptions
         if (!specialization.isAssumptionGroup()) {
             if (firstAssumption.isTrivialFieldReference()) {
                 return triples;
@@ -4219,26 +4220,30 @@ public class FlatNodeGenFactory {
         builder.tree(createSpecializationFieldReference(frameState, specialization, assumptionName, false));
         builder.string(" = ");
 
-        CodeTreeBuilder argumentsBuilder = builder.startStaticCall(types.AssumptionGroup, "createFromAssumptions");
+        String groupFactoryMethodName;
 
         List<AssumptionExpression> assumptions = specialization.getAssumptionExpressions();
+        if (assumptions.size() == 1) {
+            assert specialization.isAssumptionGroup();
+            assert assumptions.get(0).isAssumptionArray();
+            groupFactoryMethodName = "create";
+        } else if (assumptions.size() == 2 && !assumptions.get(1).isAssumptionArray()) {
+            // 0 index can be array or assumption, we have both create options
+            groupFactoryMethodName = "create";
+        } else {
+            groupFactoryMethodName = "createFromAssumptions";
+        }
+
+        CodeTreeBuilder argumentsBuilder = builder.startStaticCall(types.AssumptionGroup, groupFactoryMethodName);
         for (AssumptionExpression assumption : assumptions) {
             LocalVariable var = frameState.get(assumption.getId());
 
             if (assumptions.size() == 1) {
                 // this implies it must be an array
                 assert assumption.isAssumptionArray();
-                if (!specialization.isAssumptionGroup() && assumption.isTrivialFieldReference()) {
-                    argumentsBuilder.startGroup().string("(Object[]) this." + assumption.getFieldNameOfTrivialReference()).end();
-                } else {
-                    argumentsBuilder.startGroup().string("(Object[]) ").tree(var.createReference()).end();
-                }
+                argumentsBuilder.startGroup().tree(var.createReference()).end();
             } else {
-                if (!specialization.isAssumptionGroup() && assumption.isTrivialFieldReference()) {
-                    argumentsBuilder.string("this." + assumption.getFieldNameOfTrivialReference());
-                } else {
-                    argumentsBuilder.tree(var.createReference());
-                }
+                argumentsBuilder.tree(var.createReference());
             }
         }
 

@@ -3,6 +3,8 @@ package com.oracle.truffle.api;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.InvalidAssumptionException;
 
+import java.util.Arrays;
+
 public final class AssumptionGroup implements Assumption {
     private static long globalEpoch = 0;
 
@@ -46,6 +48,16 @@ public final class AssumptionGroup implements Assumption {
         }
 
         return create(aArray);
+    }
+
+    public static Assumption create(Assumption[] arr, Assumption a) {
+        Assumption[] newArr = Arrays.copyOf(arr, arr.length + 1);
+        newArr[arr.length] = a;
+        return new AssumptionGroup(newArr);
+    }
+
+    public static Assumption create(Assumption a1, Assumption a2) {
+        return new AssumptionGroup(new Assumption[] {a1, a2});
     }
 
     public static Assumption create(Assumption[] assumptions) {
