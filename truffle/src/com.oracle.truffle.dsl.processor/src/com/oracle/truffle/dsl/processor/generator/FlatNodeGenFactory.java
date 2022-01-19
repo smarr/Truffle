@@ -4022,7 +4022,7 @@ public class FlatNodeGenFactory {
                 assumptionReference = createAssumptionReference(frameState, specialization);
             }
 
-            CodeTree assumptionGuard = createAssumptionGuard(assumptionReference);
+            CodeTree assumptionGuard = createAssumptionGuard(assumptionReference, assumption.isAssumptionArray());
             CodeTreeBuilder builder = new CodeTreeBuilder(null);
             builder.string("(");
             builder.tree(assumptionReference).string(" == null || ");
@@ -4048,7 +4048,7 @@ public class FlatNodeGenFactory {
         List<IfTriple> triples = new ArrayList<>();
 
         if (!assumptionGroup && assumption.isTrivialFieldReference()) {
-            triples.add(new IfTriple(null, createAssumptionGuard(createAssumptionReference(frameState, group.getSpecialization())), null));
+            triples.add(new IfTriple(null, createAssumptionGuard(createAssumptionReference(frameState, group.getSpecialization()), assumption.isAssumptionArray()), null));
         } else {
             LocalVariable var = frameState.get(assumption.getId());
             CodeTree declaration = null;
@@ -4060,7 +4060,7 @@ public class FlatNodeGenFactory {
                 frameState.set(assumption.getId(), var);
                 declaration = var.createDeclaration(assumptionExpressions);
             }
-            triples.add(new IfTriple(declaration, createAssumptionGuard(var.createReference()), null));
+            triples.add(new IfTriple(declaration, createAssumptionGuard(var.createReference(), assumption.isAssumptionArray()), null));
         }
         return triples;
     }
@@ -4394,8 +4394,12 @@ public class FlatNodeGenFactory {
         return builder == null ? null : builder.build();
     }
 
-    private CodeTree createAssumptionGuard(CodeTree assumptionValue) {
-        return CodeTreeBuilder.createBuilder().startStaticCall(types.Assumption, "isValidAssumption").tree(assumptionValue).end().build();
+    private CodeTree createAssumptionGuard(CodeTree assumptionValue, boolean isArray) {
+        if (isArray) {
+            return CodeTreeBuilder.createBuilder().startStaticCall(types.Assumption, "isValidAssumption").tree(assumptionValue).end().build();
+        }
+
+        return CodeTreeBuilder.createBuilder().startParantheses().tree(assumptionValue).string(" != null && ").startCall(assumptionValue, "isValid").end().end().build();
     }
 
     private static CodeTree combineTrees(String sep, CodeTree... trees) {

@@ -129,7 +129,7 @@ public interface Assumption {
             return false;
         }
         for (Assumption assumption : assumptions) {
-            if (!isValidAssumption(assumption)) {
+            if (assumption == null || !assumption.isValid()) {
                 return false;
             }
         }
