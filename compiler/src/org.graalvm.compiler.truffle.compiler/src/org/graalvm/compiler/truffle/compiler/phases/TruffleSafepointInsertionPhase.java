@@ -88,7 +88,8 @@ public final class TruffleSafepointInsertionPhase extends Phase {
 
     public static boolean allowsSafepoints(StructuredGraph graph) {
         // only allowed in Truffle compilations.
-        return graph.compilationId() instanceof TruffleCompilationIdentifier;
+// return graph.compilationId() instanceof TruffleCompilationIdentifier;
+        return false;
     }
 
     @Override

@@ -147,8 +147,8 @@ public abstract class TruffleSafepoint {
      * @since 21.1
      */
     public static void poll(Node location) {
-        Objects.requireNonNull(location);
-        HANDSHAKE.poll(location);
+// Objects.requireNonNull(location);
+// HANDSHAKE.poll(location);
     }
 
     /**

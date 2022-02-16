@@ -144,7 +144,7 @@ public class TruffleGraphBuilderPlugins {
         }
         registerOptimizedCallTargetPlugins(plugins, metaAccess, canDelayIntrinsification, types, primitiveBoxTypes);
         registerFrameWithoutBoxingPlugins(plugins, metaAccess, canDelayIntrinsification, providers.getConstantReflection(), types, primitiveBoxTypes);
-        registerTruffleSafepointPlugins(plugins, metaAccess, canDelayIntrinsification);
+        // registerTruffleSafepointPlugins(plugins, metaAccess, canDelayIntrinsification);
         registerNodePlugins(plugins, metaAccess, canDelayIntrinsification, providers.getConstantReflection(), types);
     }
 
