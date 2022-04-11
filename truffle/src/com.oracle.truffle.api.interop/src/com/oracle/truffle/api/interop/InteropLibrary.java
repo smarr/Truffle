@@ -53,6 +53,7 @@ import static com.oracle.truffle.api.interop.AssertUtils.validScope;
 import static com.oracle.truffle.api.interop.AssertUtils.violationInvariant;
 import static com.oracle.truffle.api.interop.AssertUtils.violationPost;
 
+import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.time.Duration;
 import java.time.Instant;
@@ -62,6 +63,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.zone.ZoneRules;
 import java.util.Objects;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
@@ -2898,7 +2901,13 @@ public abstract class InteropLibrary extends Library {
                         || receiver instanceof Float //
                         || receiver instanceof Double //
                         || receiver instanceof String //
-                        || receiver instanceof TruffleString;
+                        || receiver instanceof TruffleString //
+
+                        // SM: I need these for SOMns and don't require good interop a the moment
+                        || receiver instanceof BigInteger //
+                        || receiver instanceof ReentrantLock //
+                        || receiver instanceof Condition //
+                        || receiver instanceof Object[];
     }
 
     /**
