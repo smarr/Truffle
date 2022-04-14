@@ -57,7 +57,6 @@ import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.impl.FrameWithoutBoxing;
 import com.oracle.truffle.api.nodes.BlockNode;
-import com.oracle.truffle.api.nodes.ControlFlowException;
 import com.oracle.truffle.api.nodes.EncapsulatingNodeReference;
 import com.oracle.truffle.api.nodes.ExecutionSignature;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
@@ -466,8 +465,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
          * should still be able to use profiled arguments until an incompatible argument is passed.
          * So we profile arguments for indirect calls too, but behind a truffle boundary.
          */
-        profileIndirectArguments(args);
-
         try {
             return doInvoke(args);
         } finally {
@@ -484,17 +481,7 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
     // Note: {@code PartialEvaluator} looks up this method by name and signature.
     public final Object callDirect(Node location, Object... args) {
         try {
-            try {
-                Object result;
-                profileArguments(args);
-                result = doInvoke(args);
-                if (CompilerDirectives.inCompiledCode()) {
-                    result = injectReturnValueProfile(result);
-                }
-                return result;
-            } catch (Throwable t) {
-                throw rethrow(profileExceptionType(t));
-            }
+            return doInvoke(args);
         } finally {
             // this assertion is needed to keep the values from being cleared as non-live locals
             assert keepAlive(location);
@@ -649,12 +636,9 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             Object toRet = rootNode.execute(frame);
             TruffleSafepoint.poll(rootNode);
             return toRet;
-        } catch (ControlFlowException t) {
-            throw rethrow(profileExceptionType(t));
         } catch (Throwable t) {
-            Throwable profiledT = profileExceptionType(t);
-            GraalRuntimeAccessor.LANGUAGE.onThrowable(null, this, profiledT, frame);
-            throw rethrow(profiledT);
+            GraalRuntimeAccessor.LANGUAGE.onThrowable(null, this, t, frame);
+            throw rethrow(t);
         } finally {
             if (CompilerDirectives.inInterpreter() && tier != CompilationState.INTERPRETED) {
                 notifyDeoptimized(frame);
@@ -1335,52 +1319,8 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
         }
     }
 
-    private Object injectReturnValueProfile(Object result) {
-        ReturnProfile returnProfile = this.returnProfile;
-        if (CompilerDirectives.inCompiledCode() && returnProfile != null && returnProfile.assumption.isValid()) {
-            return OptimizedCallTarget.unsafeCast(result, returnProfile.type, true, true, true);
-        }
-        return result;
-    }
-
-    protected final ReturnProfile getInitializedReturnProfile() {
-        if (returnProfile == null) {
-            /*
-             * We always need an assumption. If this method is called before the profile was
-             * initialized, we have to be conservative and disable profiling.
-             */
-            CompilerDirectives.transferToInterpreterAndInvalidate();
-            RETURN_PROFILE_UPDATER.compareAndSet(this, null, ReturnProfile.INVALID);
-            assert returnProfile != null;
-        }
-
-        return returnProfile;
-    }
-
     // endregion
     // region Exception profiling
-
-    @SuppressWarnings("unchecked")
-    private <T extends Throwable> T profileExceptionType(T value) {
-        Class<? extends Throwable> clazz = profiledExceptionType;
-        if (clazz != Throwable.class) {
-            if (clazz != null && value.getClass() == clazz) {
-                if (CompilerDirectives.inInterpreter()) {
-                    return value;
-                } else {
-                    return (T) CompilerDirectives.castExact(value, clazz);
-                }
-            } else {
-                CompilerDirectives.transferToInterpreterAndInvalidate();
-                if (clazz == null) {
-                    profiledExceptionType = value.getClass();
-                } else {
-                    profiledExceptionType = Throwable.class;
-                }
-            }
-        }
-        return value;
-    }
 
     // endregion
 
