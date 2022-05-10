@@ -46,10 +46,12 @@ public abstract class AbstractAssumption implements Assumption {
 
     protected final Object name;
     protected volatile boolean isValid;
+    protected volatile boolean isValid2;
 
     protected AbstractAssumption(Object name) {
         this.name = name;
         this.isValid = true;
+        this.isValid2 = true;
     }
 
     @Override
