@@ -157,14 +157,14 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
 
     @Override
     public void invalidate() {
-        if (isValid && isValid2) {
+        if (isValid && isValid2 == 0) {
             invalidateImpl("");
         }
     }
 
     @Override
     public void invalidate(String message) {
-        if (isValid && isValid2) {
+        if (isValid && isValid2 == 0) {
             invalidateImpl(message);
         }
     }
@@ -175,7 +175,7 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
          * Check again, now that we are holding the lock. Since isValid is defined volatile,
          * double-checked locking is allowed.
          */
-        if (!isValid && !isValid2) {
+        if (!isValid && isValid2 != 0) {
             return;
         }
 
@@ -230,7 +230,7 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
         size = 0;
         sizeAfterLastRemove = 0;
         isValid = false;
-        isValid2 = false;
+        isValid2 = 13123;
 
         if (logStackTrace) {
             logStackTrace(engineOptions, logger);
@@ -289,7 +289,7 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
      * (e.g., the compiler) must ensure the dependent code is never executed.
      */
     public synchronized Consumer<OptimizedAssumptionDependency> registerDependency() {
-        if (isValid && isValid2) {
+        if (isValid && isValid2 == 0) {
             if (this.name == Lazy.ALWAYS_VALID_NAME) {
                 /*
                  * An ALWAYS_VALID assumption does not need registration, as they are by definition
@@ -313,7 +313,7 @@ public final class OptimizedAssumption extends AbstractAssumption implements For
 
     @Override
     public boolean isValid() {
-        return isValid && isValid2;
+        return isValid && isValid2 == 0;
     }
 
     private void logInvalidatedDependency(OptimizedAssumptionDependency dependency, String message, TruffleLogger logger) {
