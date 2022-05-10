@@ -637,9 +637,6 @@ public abstract class OptimizedCallTarget implements CompilableTruffleAST, RootC
             GraalRuntimeAccessor.LANGUAGE.onThrowable(null, this, t, frame);
             throw rethrow(t);
         } finally {
-            if (CompilerDirectives.inInterpreter() && tier != CompilationState.INTERPRETED) {
-                notifyDeoptimized(frame);
-            }
             // reachability fence is needed to keep the values from being cleared as non-live locals
             Reference.reachabilityFence(frame);
             Reference.reachabilityFence(this);
