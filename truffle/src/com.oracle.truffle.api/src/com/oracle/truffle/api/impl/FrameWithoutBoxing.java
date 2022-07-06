@@ -149,9 +149,11 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
             primitiveLocalsArray = EMPTY_LONG_ARRAY;
             tagsArray = EMPTY_BYTE_ARRAY;
         } else {
-            localsArray = new Object[size];
             if (defaultValue != null) {
+                localsArray = new Object[size];
                 Arrays.fill(localsArray, defaultValue);
+            } else {
+                localsArray = new Object[size];
             }
             primitiveLocalsArray = new long[size];
             tagsArray = new byte[size];
@@ -161,20 +163,25 @@ public final class FrameWithoutBoxing implements VirtualFrame, MaterializedFrame
             indexedPrimitiveLocalsArray = EMPTY_LONG_ARRAY;
             indexedTagsArray = EMPTY_BYTE_ARRAY;
         } else {
-            indexedLocalsArray = new Object[indexedSize];
             if (defaultValue != null) {
+                indexedLocalsArray = new Object[indexedSize];
                 Arrays.fill(indexedLocalsArray, defaultValue);
+            } else {
+                indexedLocalsArray = new Object[indexedSize];
             }
             indexedPrimitiveLocalsArray = new long[indexedSize];
-            indexedTagsArray = new byte[indexedSize];
             if (frameSupport.usesAllStaticMode(descriptor)) {
+                indexedTagsArray = new byte[indexedSize];
                 Arrays.fill(indexedTagsArray, STATIC_TAG);
             } else if (frameSupport.usesMixedStaticMode(descriptor)) {
+                indexedTagsArray = new byte[indexedSize];
                 for (int slot = 0; slot < indexedTagsArray.length; slot++) {
                     if (descriptor.getSlotKind(slot) == FrameSlotKind.Static) {
                         indexedTagsArray[slot] = STATIC_TAG;
                     }
                 }
+            } else {
+                indexedTagsArray = new byte[indexedSize];
             }
         }
         if (auxiliarySize == 0) {
