@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.tools.utils.json.JSONArray;
 import com.oracle.truffle.tools.utils.json.JSONObject;
@@ -78,12 +79,14 @@ public class OperationsStatistics {
         return new OperationsStatistics(statePath);
     }
 
+    @TruffleBoundary
     public OperationsStatistics enter() {
         OperationsStatistics prev = STATISTICS.get();
         STATISTICS.set(this);
         return prev;
     }
 
+    @TruffleBoundary
     public void exit(OperationsStatistics prev) {
         STATISTICS.set(prev);
     }
