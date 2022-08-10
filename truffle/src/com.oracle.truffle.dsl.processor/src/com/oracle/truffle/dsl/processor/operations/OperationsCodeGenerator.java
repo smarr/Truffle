@@ -362,7 +362,9 @@ public class OperationsCodeGenerator extends CodeTypeElementFactory<OperationsDa
 
         for (String methodName : new String[]{"dump", "getSourceInfo", "execute", "createFrameDescriptor"}) {
             CodeExecutableElement met = GeneratorUtils.overrideImplement(types.OperationNode, methodName);
-            met.createBuilder().startThrow().startNew(context.getType(UnsupportedOperationException.class)).end(2);
+            CodeTreeBuilder builder = met.createBuilder();
+            GeneratorUtils.addBoundaryOrTransferToInterpreter(met, builder);
+            builder.startThrow().startNew(context.getType(UnsupportedOperationException.class)).end(2);
             typOperationNodeImpl.add(met);
         }
 
