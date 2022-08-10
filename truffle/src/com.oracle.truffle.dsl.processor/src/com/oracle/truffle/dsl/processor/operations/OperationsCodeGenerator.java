@@ -548,6 +548,7 @@ public class OperationsCodeGenerator extends CodeTypeElementFactory<OperationsDa
         CodeExecutableElement mCreateFrameDescriptor = GeneratorUtils.overrideImplement(types.OperationNode, "createFrameDescriptor");
         CodeTreeBuilder b = mCreateFrameDescriptor.createBuilder();
         b.statement("FrameDescriptor.Builder builder = FrameDescriptor.newBuilder()");
+        b.statement("if (defaultValue != null) { builder.defaultValue(defaultValue); }");
         b.startStatement().string("builder.addSlots(_maxLocals + _maxStack,").type(types.FrameSlotKind).string(".Illegal)").end();
         b.statement("return builder.build()");
         return mCreateFrameDescriptor;

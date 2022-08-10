@@ -64,7 +64,7 @@ public abstract class OperationNode extends Node {
 
     protected abstract int[] getSourceInfo();
 
-    public abstract FrameDescriptor createFrameDescriptor();
+    public abstract FrameDescriptor createFrameDescriptor(Object defaultValue);
 
     public abstract Object execute(VirtualFrame frame);
 

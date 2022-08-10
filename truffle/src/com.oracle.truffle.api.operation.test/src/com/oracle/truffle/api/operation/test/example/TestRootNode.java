@@ -49,7 +49,7 @@ public class TestRootNode extends RootNode {
     @Child private OperationNode node;
 
     TestRootNode(OperationNode node) {
-        super(null, node.createFrameDescriptor());
+        super(null, node.createFrameDescriptor(null));
         this.node = node;
     }
 
