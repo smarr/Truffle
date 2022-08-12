@@ -81,6 +81,8 @@ public class OperationsContext {
 
     public LoadArgumentInstruction[] loadArgumentInstructions;
     public LoadConstantInstruction[] loadConstantInstructions;
+    public LoadLocalInstruction[] loadLocalInstructions;
+    public StoreLocalInstruction[] storeLocalInstructions;
 
     public final ArrayList<Instruction> instructions = new ArrayList<>();
     public final ArrayList<Operation> operations = new ArrayList<>();
@@ -141,11 +143,20 @@ public class OperationsContext {
     }
 
     private void createLoadStoreLocal() {
-        StoreLocalInstruction storeLocal = add(new StoreLocalInstruction(this, instructionId++));
-        add(new Operation.Simple(this, "StoreLocal", operationId++, 1, storeLocal));
+        storeLocalInstructions = new StoreLocalInstruction[FrameKind.values().length];
+        for (FrameKind kind : data.getFrameKinds()) {
+            storeLocalInstructions[kind.ordinal()] = add(new StoreLocalInstruction(this, instructionId++, kind));
+        }
+        StoreLocalInstruction uninitStoreLocal = add(new StoreLocalInstruction(this, instructionId++, null));
+        add(new Operation.Simple(this, "StoreLocal", operationId++, 1, uninitStoreLocal));
 
-        LoadLocalInstruction loadLocal = add(new LoadLocalInstruction(this, instructionId++));
-        add(new Operation.Simple(this, "LoadLocal", operationId++, 0, loadLocal));
+        loadLocalInstructions = new LoadLocalInstruction[FrameKind.values().length];
+        for (FrameKind kind : data.getFrameKinds()) {
+            loadLocalInstructions[kind.ordinal()] = add(new LoadLocalInstruction(this, instructionId++, kind));
+        }
+        LoadLocalInstruction uninitLoadLocal = add(new LoadLocalInstruction(this, instructionId++, null));
+
+        add(new Operation.Simple(this, "LoadLocal", operationId++, 0, uninitLoadLocal));
     }
 
     private void createLoadArgument() {

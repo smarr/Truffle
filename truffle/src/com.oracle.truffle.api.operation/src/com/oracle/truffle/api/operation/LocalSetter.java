@@ -92,20 +92,19 @@ public final class LocalSetter {
     }
 
     private static boolean checkFrameSlot(VirtualFrame frame, int index, FrameSlotKind target) {
-        return false;
-        // FrameDescriptor descriptor = frame.getFrameDescriptor();
-        // FrameSlotKind slotKind = descriptor.getSlotKind(index);
-        // if (slotKind == FrameSlotKind.Illegal) {
-        // descriptor.setSlotKind(index, target);
-        // return true;
-        // } else if (slotKind == target) {
-        // return true;
-        // } else if (slotKind == FrameSlotKind.Object) {
-        // return false;
-        // } else {
-        // descriptor.setSlotKind(index, FrameSlotKind.Object);
-        // return false;
-        // }
+        FrameDescriptor descriptor = frame.getFrameDescriptor();
+        FrameSlotKind slotKind = descriptor.getSlotKind(index);
+        if (slotKind == FrameSlotKind.Illegal) {
+            descriptor.setSlotKind(index, target);
+            return true;
+        } else if (slotKind == target) {
+            return true;
+        } else if (slotKind == FrameSlotKind.Object) {
+            return false;
+        } else {
+            descriptor.setSlotKind(index, FrameSlotKind.Object);
+            return false;
+        }
     }
 
     static void setLong(VirtualFrame frame, int index, long value) {

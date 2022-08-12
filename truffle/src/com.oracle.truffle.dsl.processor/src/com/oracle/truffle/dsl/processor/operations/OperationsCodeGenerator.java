@@ -1503,7 +1503,7 @@ public class OperationsCodeGenerator extends CodeTypeElementFactory<OperationsDa
         for (TypeKind kind : m.getBoxingEliminatedTypes()) {
             FrameKind frameKind = FrameKind.valueOfPrimitive(kind);
             baseClass.add(createExpectPrimitive(frameKind));
-            // baseClass.add(createStoreLocalCheck(frameKind));
+            baseClass.add(createStoreLocalCheck(frameKind));
         }
 
         return baseClass;
