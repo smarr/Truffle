@@ -90,7 +90,7 @@ final class BytecodeOSRRootNode extends BaseOSRRootNode {
                 osrNode.copyIntoOSRFrame(frame, parentFrame, target, entryTagsCache);
             }
             try {
-                return osrNode.executeOSR(parentFrame, target, interpreterState);
+                return osrNode.executeOSR(frame, target, interpreterState);
             } finally {
                 osrNode.restoreParentFrame(frame, parentFrame);
             }
