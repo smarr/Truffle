@@ -482,6 +482,25 @@ public class OperationsCodeGenerator extends CodeTypeElementFactory<OperationsDa
 
         typOperationNodeImpl.add(createChangeInterpreter(typBytecodeBase));
 
+        boolean hasStoreParentFrameInArguments = false;
+        for (var e : m.getTemplateType().getEnclosedElements()) {
+            if (e.getSimpleName().contentEquals("storeParentFrameInArguments")) {
+                hasStoreParentFrameInArguments = true;
+            }
+        }
+
+        if (hasStoreParentFrameInArguments) {
+            CodeExecutableElement mStoreParentFrameInArguments = GeneratorUtils.overrideImplement(types.BytecodeOSRNode, "storeParentFrameInArguments");
+            mStoreParentFrameInArguments.getModifiers().remove(Modifier.DEFAULT);
+            typOperationNodeImpl.add(mStoreParentFrameInArguments);
+            mStoreParentFrameInArguments.createBuilder().startReturn().startStaticCall(m.getTemplateType().asType(), "storeParentFrameInArguments").string("parentFrame").end(2);
+
+            CodeExecutableElement mRestoreParentFrameFromArguments = GeneratorUtils.overrideImplement(types.BytecodeOSRNode, "restoreParentFrameFromArguments");
+            mRestoreParentFrameFromArguments.getModifiers().remove(Modifier.DEFAULT);
+            typOperationNodeImpl.add(mRestoreParentFrameFromArguments);
+            mRestoreParentFrameFromArguments.createBuilder().startReturn().startStaticCall(m.getTemplateType().asType(), "restoreParentFrameFromArguments").string("arguments").end(2);
+        }
+
         return typOperationNodeImpl;
     }
 
