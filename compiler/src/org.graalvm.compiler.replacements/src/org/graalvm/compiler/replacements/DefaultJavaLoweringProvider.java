@@ -536,6 +536,26 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
     public void lowerLoadIndexedNode(LoadIndexedNode loadIndexed, LoweringTool tool, int arrayBaseOffset) {
         StructuredGraph graph = loadIndexed.graph();
         ValueNode array = loadIndexed.array();
+
+        if (graph.isMyBytecodeLoop) {
+            // we are sure this is never null... and we are always within bounds
+            JavaKind elementKind = loadIndexed.elementKind();
+            if (elementKind == JavaKind.Byte) {
+                Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
+
+                ValueNode index = loadIndexed.index();
+                ValueNode positiveIndex = createPositiveIndex(graph, index, null);
+                AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
+
+                ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
+                ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
+
+                loadIndexed.replaceAtUsages(readValue);
+                graph.replaceFixed(loadIndexed, memoryRead);
+                return;
+            }
+        }
+
         array = createNullCheckedValue(array, loadIndexed, tool);
         JavaKind elementKind = loadIndexed.elementKind();
         Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
