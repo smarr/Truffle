@@ -27,6 +27,7 @@ package org.graalvm.compiler.nodes;
 import static jdk.vm.ci.services.Services.IS_BUILDING_NATIVE_IMAGE;
 import static jdk.vm.ci.services.Services.IS_IN_NATIVE_IMAGE;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -339,6 +340,9 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
 
     private OptimizationLog optimizationLog;
 
+    public final boolean isMyBytecodeLoop;
+// public final boolean isBytecodeLoop;
+
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
                     int entryBCI,
@@ -370,7 +374,32 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.inliningLog = GraalOptions.TraceInlining.getValue(options) ? new InliningLog(rootMethod) : null;
         this.callerContext = context;
         this.optimizationLog = OptimizationLog.getInstance(this);
+
+        isMyBytecodeLoop = isMyBytecodeLoop(method);
+// isBytecodeLoop = isBytecodeLoop(method);
     }
+
+    private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+        return method.getName().equals("executeGeneric") &&
+                        method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
+    }
+
+// private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+// if (method == null) {
+// return false;
+// }
+//
+// boolean isBcLoop = false;
+// for (Annotation a : method.getAnnotations()) {
+// if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+// isBcLoop = true;
+// }
+// }
+// return isBcLoop;
+// }
 
     private static boolean checkIsSubstitutionInvariants(ResolvedJavaMethod method, boolean isSubstitution) {
         if (!IS_IN_NATIVE_IMAGE && !IS_BUILDING_NATIVE_IMAGE) {
