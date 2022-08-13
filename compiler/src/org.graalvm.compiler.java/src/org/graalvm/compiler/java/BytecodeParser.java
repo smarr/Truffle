@@ -261,6 +261,7 @@ import static org.graalvm.compiler.nodes.extended.BranchProbabilityNode.EXTREMEL
 import static org.graalvm.compiler.nodes.graphbuilderconf.IntrinsicContext.CompilationContext.INLINE_DURING_PARSING;
 import static org.graalvm.compiler.nodes.type.StampTool.isPointerNonNull;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -935,6 +936,9 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     private final boolean uninitializedIsError;
     private final int traceLevel;
 
+    private final boolean isMyBytecodeLoop;
+    private final boolean isBytecodeLoop;
+
     protected BytecodeParser(GraphBuilderPhase.Instance graphBuilderInstance, StructuredGraph graph, BytecodeParser parent, ResolvedJavaMethod method,
                     int entryBCI, IntrinsicContext intrinsicContext) {
         super(graphBuilderInstance.providers);
@@ -977,6 +981,24 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
 
         int level = TraceBytecodeParserLevel.getValue(options);
         this.traceLevel = level != 0 ? refineTraceLevel(level) : 0;
+
+        isMyBytecodeLoop = isMyBytecodeLoop(method);
+        isBytecodeLoop = isBytecodeLoop(method);
+    }
+
+    private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+        return method.getName().equals("executeGeneric") &&
+                        method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
+    }
+
+    private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+        boolean isBcLoop = false;
+        for (Annotation a : method.getAnnotations()) {
+            if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+                isBcLoop = true;
+            }
+        }
+        return isBcLoop;
     }
 
     /**
