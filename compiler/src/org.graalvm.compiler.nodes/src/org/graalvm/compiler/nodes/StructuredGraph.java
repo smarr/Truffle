@@ -380,11 +380,18 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
     }
 
     private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
         return method.getName().equals("executeGeneric") &&
                         method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
     }
 
     private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+
         boolean isBcLoop = false;
         for (Annotation a : method.getAnnotations()) {
             if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
