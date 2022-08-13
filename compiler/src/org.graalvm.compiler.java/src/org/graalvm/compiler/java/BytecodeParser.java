@@ -1603,7 +1603,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     }
 
     protected GuardingNode maybeEmitExplicitBoundsCheck(ValueNode receiver, ValueNode index) {
-        if (!needsExplicitBoundsCheckException(receiver, index)) {
+        if (isMyBytecodeLoop || !needsExplicitBoundsCheckException(receiver, index)) {
             return null;
         }
         ValueNode length = append(genArrayLength(receiver));
@@ -3997,7 +3997,12 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
         ValueNode array = frameState.pop(JavaKind.Object);
 
         array = maybeEmitExplicitNullCheck(array);
-        GuardingNode boundsCheck = maybeEmitExplicitBoundsCheck(array, index);
+        GuardingNode boundsCheck;
+        if (isMyBytecodeLoop) {
+            boundsCheck = null;
+        } else {
+            boundsCheck = maybeEmitExplicitBoundsCheck(array, index);
+        }
 
         for (NodePlugin plugin : graphBuilderConfig.getPlugins().getNodePlugins()) {
             if (plugin.handleLoadIndexed(this, array, index, boundsCheck, kind)) {
@@ -4014,9 +4019,16 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
         ValueNode index = frameState.pop(JavaKind.Int);
         ValueNode array = frameState.pop(JavaKind.Object);
 
-        array = maybeEmitExplicitNullCheck(array);
-        GuardingNode boundsCheck = maybeEmitExplicitBoundsCheck(array, index);
-        GuardingNode storeCheck = maybeEmitExplicitStoreCheck(array, kind, value);
+        GuardingNode boundsCheck;
+        GuardingNode storeCheck;
+        if (isMyBytecodeLoop) {
+            boundsCheck = null;
+            storeCheck = null;
+        } else {
+            array = maybeEmitExplicitNullCheck(array);
+            boundsCheck = maybeEmitExplicitBoundsCheck(array, index);
+            storeCheck = maybeEmitExplicitStoreCheck(array, kind, value);
+        }
 
         for (NodePlugin plugin : graphBuilderConfig.getPlugins().getNodePlugins()) {
             if (plugin.handleStoreIndexed(this, array, index, boundsCheck, storeCheck, kind, value)) {
