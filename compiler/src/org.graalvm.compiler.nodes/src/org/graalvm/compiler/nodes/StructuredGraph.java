@@ -341,8 +341,8 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
     private OptimizationLog optimizationLog;
 
     public final boolean isMyBytecodeLoop;
-    public final boolean isBytecodeLoop;
-    
+// public final boolean isBytecodeLoop;
+
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
                     int entryBCI,
@@ -376,7 +376,7 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.optimizationLog = OptimizationLog.getInstance(this);
 
         isMyBytecodeLoop = isMyBytecodeLoop(method);
-        isBytecodeLoop = isBytecodeLoop(method);
+// isBytecodeLoop = isBytecodeLoop(method);
     }
 
     private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
@@ -387,19 +387,19 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
                         method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
     }
 
-    private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
-        if (method == null) {
-            return false;
-        }
-
-        boolean isBcLoop = false;
-        for (Annotation a : method.getAnnotations()) {
-            if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
-                isBcLoop = true;
-            }
-        }
-        return isBcLoop;
-    }
+// private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+// if (method == null) {
+// return false;
+// }
+//
+// boolean isBcLoop = false;
+// for (Annotation a : method.getAnnotations()) {
+// if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+// isBcLoop = true;
+// }
+// }
+// return isBcLoop;
+// }
 
     private static boolean checkIsSubstitutionInvariants(ResolvedJavaMethod method, boolean isSubstitution) {
         if (!IS_IN_NATIVE_IMAGE && !IS_BUILDING_NATIVE_IMAGE) {

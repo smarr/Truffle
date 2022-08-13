@@ -937,7 +937,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     private final int traceLevel;
 
     private final boolean isMyBytecodeLoop;
-    private final boolean isBytecodeLoop;
+// private final boolean isBytecodeLoop;
 
     protected BytecodeParser(GraphBuilderPhase.Instance graphBuilderInstance, StructuredGraph graph, BytecodeParser parent, ResolvedJavaMethod method,
                     int entryBCI, IntrinsicContext intrinsicContext) {
@@ -983,7 +983,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
         this.traceLevel = level != 0 ? refineTraceLevel(level) : 0;
 
         isMyBytecodeLoop = isMyBytecodeLoop(method);
-        isBytecodeLoop = isBytecodeLoop(method);
+// isBytecodeLoop = isBytecodeLoop(method);
     }
 
     private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
@@ -993,19 +993,19 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
         return method.getName().equals("executeGeneric") &&
                         method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
     }
-
-    private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
-        if (method == null) {
-            return false;
-        }
-        boolean isBcLoop = false;
-        for (Annotation a : method.getAnnotations()) {
-            if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
-                isBcLoop = true;
-            }
-        }
-        return isBcLoop;
-    }
+//
+// private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+// if (method == null) {
+// return false;
+// }
+// boolean isBcLoop = false;
+// for (Annotation a : method.getAnnotations()) {
+// if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+// isBcLoop = true;
+// }
+// }
+// return isBcLoop;
+// }
 
     /**
      * Returns true if the current parse position is covered by an exception handler, including
