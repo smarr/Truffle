@@ -24,6 +24,7 @@
  */
 package jdk.graal.compiler.nodes;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -417,6 +418,9 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
 
     private OptimizationLog optimizationLog;
 
+    public final boolean isMyBytecodeLoop;
+// public final boolean isBytecodeLoop;
+
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
                     int entryBCI,
@@ -448,7 +452,32 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.callerContext = context;
         this.optimizationLog = OptimizationLog.getInstance(this);
         this.cacheInvalidationListener = new CacheInvalidationListener();
+
+        isMyBytecodeLoop = isMyBytecodeLoop(method);
+// isBytecodeLoop = isBytecodeLoop(method);
     }
+
+    private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+        return method.getName().equals("executeGeneric") &&
+                        method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
+    }
+
+// private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+// if (method == null) {
+// return false;
+// }
+//
+// boolean isBcLoop = false;
+// for (Annotation a : method.getAnnotations()) {
+// if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+// isBcLoop = true;
+// }
+// }
+// return isBcLoop;
+// }
 
     public void setLastSchedule(ScheduleResult result) {
         GraalError.guarantee(result == null || result.cfg.getStartBlock().isModifiable(), "Schedule must use blocks that can be modified");
