@@ -553,6 +553,27 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                 loadIndexed.replaceAtUsages(readValue);
                 graph.replaceFixed(loadIndexed, memoryRead);
                 return;
+            } else if (elementKind == JavaKind.Object) {
+                if (array instanceof NewArrayNode) {
+                    NewArrayNode newArr = (NewArrayNode) array;
+                    // this is a wild guess, to make it slightly more reliable
+                    // we're trying to identify all LoadIndexed that access the "stack" array
+                    // in the bc loop
+                    if (newArr.getId() < 15) {
+                        Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
+
+                        ValueNode index = loadIndexed.index();
+                        ValueNode positiveIndex = createPositiveIndex(graph, index, null);
+                        AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
+
+                        ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
+                        ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
+
+                        loadIndexed.replaceAtUsages(readValue);
+                        graph.replaceFixed(loadIndexed, memoryRead);
+                        return;
+                    }
+                }
             }
         }
 
