@@ -261,7 +261,6 @@ import static org.graalvm.compiler.nodes.extended.BranchProbabilityNode.EXTREMEL
 import static org.graalvm.compiler.nodes.graphbuilderconf.IntrinsicContext.CompilationContext.INLINE_DURING_PARSING;
 import static org.graalvm.compiler.nodes.type.StampTool.isPointerNonNull;
 
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -936,7 +935,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     private final boolean uninitializedIsError;
     private final int traceLevel;
 
-// private final boolean isMyBytecodeLoop;
+    private final boolean isMyBytecodeLoop;
 // private final boolean isBytecodeLoop;
 
     protected BytecodeParser(GraphBuilderPhase.Instance graphBuilderInstance, StructuredGraph graph, BytecodeParser parent, ResolvedJavaMethod method,
@@ -982,7 +981,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
         int level = TraceBytecodeParserLevel.getValue(options);
         this.traceLevel = level != 0 ? refineTraceLevel(level) : 0;
 
-// isMyBytecodeLoop = isMyBytecodeLoop(method);
+        isMyBytecodeLoop = isMyBytecodeLoop(method);
 // isBytecodeLoop = isBytecodeLoop(method);
     }
 
@@ -1609,7 +1608,24 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     }
 
     protected GuardingNode maybeEmitExplicitBoundsCheck(ValueNode receiver, ValueNode index) {
-        // isMyBytecodeLoop ||
+        if (isMyBytecodeLoop) {
+            if (receiver instanceof PiNode) {
+                PiNode r = (PiNode) receiver;
+                if (r.object() instanceof LoadFieldNode) {
+                    // if it's one of our know fields, we don't need a bounds check
+                    LoadFieldNode load = (LoadFieldNode) r.object();
+                    ResolvedJavaField f = load.field();
+                    switch (f.getName()) {
+                        case "bytecodesField":
+                        case "literalsAndConstantsField":
+                        case "inlinedLoopsField":
+                        case "quickenedField":
+                            return null;
+                    }
+                }
+            }
+        }
+
         if (!needsExplicitBoundsCheckException(receiver, index)) {
             return null;
         }

@@ -587,7 +587,7 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
         ValueNode index = loadIndexed.index();
 
         Node pred = loadIndexed.predecessor();
-        while (!(pred instanceof BeginNode)) {
+        while (!(pred instanceof BeginNode) && pred != null) {
             pred = pred.predecessor();
         }
 
