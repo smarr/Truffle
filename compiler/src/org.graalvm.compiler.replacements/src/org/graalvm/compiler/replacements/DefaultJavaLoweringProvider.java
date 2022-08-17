@@ -555,6 +555,11 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                         lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                         return;
                     }
+                } else if (array instanceof LoadFieldNode) {
+                    if (array.getId() < 20) {
+                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                        return;
+                    }
                 }
             }
         }
