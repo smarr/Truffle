@@ -1599,6 +1599,44 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
     }
 
     public ValueNode maybeEmitExplicitNullCheck(ValueNode receiver) {
+        if (isMyBytecodeLoop) {
+            if (receiver instanceof LoadFieldNode) {
+                // if it's one of our know fields, we don't need a bounds check
+                LoadFieldNode load = (LoadFieldNode) receiver;
+                // making sure it's what we hope it is, these reads should all be early in the
+                // graphs
+                if (load.getId() < 25) {
+                    ResolvedJavaField f = load.field();
+                    switch (f.getName()) {
+                        // those are fields on the bytecode loop node
+                        case "bytecodesField":
+                        case "literalsAndConstantsField":
+                        case "inlinedLoopsField":
+                        case "quickenedField":
+                        case "arguments": // this is on the FrameWithoutBoxing
+                            receiver.setStamp(receiver.stamp(NodeView.DEFAULT).improveWith(StampFactory.objectNonNull()));
+                            return receiver;
+                    }
+                }
+            } else if (receiver instanceof ParameterNode) {
+                // we promise, this and the frame are always set, I swear
+                receiver.setStamp(receiver.stamp(NodeView.DEFAULT).improveWith(StampFactory.objectNonNull()));
+                return receiver;
+            } else if (receiver instanceof Invoke) {
+                Invoke i = (Invoke) receiver;
+                String name = i.callTarget().targetName();
+                switch (name) {
+                    case "BytecodeLoopNode.determineOuterContext":
+                    case "BytecodeLoopNode.determineContext":
+                    case "VirtualFrame.getArguments":
+                        // setting the stamp here breaks the compiler for some reason
+                        // so, let's just not emit the null check then
+                        // receiver.setStamp(receiver.stamp(NodeView.DEFAULT).improveWith(StampFactory.objectNonNull()));
+                        return receiver;
+                }
+            }
+        }
+
         if (StampTool.isPointerNonNull(receiver.stamp(NodeView.DEFAULT)) || !needsExplicitNullCheckException(receiver)) {
             return receiver;
         }
