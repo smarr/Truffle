@@ -52,6 +52,7 @@ import org.graalvm.compiler.debug.DebugCloseable;
 import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodeinfo.InputType;
+import org.graalvm.compiler.nodes.BeginNode;
 import org.graalvm.compiler.nodes.CompressionNode.CompressionOp;
 import org.graalvm.compiler.nodes.ComputeObjectAddressNode;
 import org.graalvm.compiler.nodes.ConstantNode;
@@ -584,7 +585,13 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
         Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
 
         ValueNode index = loadIndexed.index();
-        ValueNode positiveIndex = createPositiveIndex(graph, index, null);
+
+        Node pred = loadIndexed.predecessor();
+        while (!(pred instanceof BeginNode)) {
+            pred = pred.predecessor();
+        }
+
+        ValueNode positiveIndex = createPositiveIndex(graph, index, (BeginNode) pred);
         AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
 
         ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
