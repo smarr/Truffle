@@ -53,6 +53,7 @@ import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodeinfo.InputType;
 import org.graalvm.compiler.nodes.BeginNode;
+import org.graalvm.compiler.nodes.CompressionNode;
 import org.graalvm.compiler.nodes.CompressionNode.CompressionOp;
 import org.graalvm.compiler.nodes.ComputeObjectAddressNode;
 import org.graalvm.compiler.nodes.ConstantNode;
@@ -559,6 +560,30 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                     if (array.getId() < 30) {
                         lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                         return;
+                    }
+                } else if (array instanceof PiNode) {
+                    PiNode pi = (PiNode) array;
+                    ValueNode value;
+                    if (pi.object() instanceof CompressionNode) {
+                        CompressionNode c = (CompressionNode) pi.object();
+                        value = c.getValue();
+                        if (value instanceof ReadNode) {
+                            ReadNode read = (ReadNode) value;
+                            if (read.getLocationIdentity() instanceof FieldLocationIdentity) {
+                                FieldLocationIdentity field = (FieldLocationIdentity) read.getLocationIdentity();
+                                String name = field.getField().getName();
+                                switch (name) {
+                                    // those are fields on the bytecode loop node
+                                    case "bytecodesField":
+                                    case "literalsAndConstantsField":
+                                    case "inlinedLoopsField":
+                                    case "quickenedField":
+                                    case "arguments": // this is on the FrameWithoutBoxing
+                                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                                        return;
+                                }
+                            }
+                        }
                     }
                 }
             }
