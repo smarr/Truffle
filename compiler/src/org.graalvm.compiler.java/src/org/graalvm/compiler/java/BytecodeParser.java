@@ -1614,16 +1614,61 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
                 if (r.object() instanceof LoadFieldNode) {
                     // if it's one of our know fields, we don't need a bounds check
                     LoadFieldNode load = (LoadFieldNode) r.object();
+                    // making sure it's what we hope it is, these reads should all be early in the
+                    // graphs
+                    if (load.getId() < 25) {
+                        ResolvedJavaField f = load.field();
+                        switch (f.getName()) {
+                            // those are fields on the bytecode loop node
+                            case "bytecodesField":
+                            case "literalsAndConstantsField":
+                            case "inlinedLoopsField":
+                            case "quickenedField":
+                            case "arguments": // this is on the FrameWithoutBoxing
+                                return null;
+                        }
+                    }
+                } else if (r.object() instanceof Invoke) {
+                    Invoke i = (Invoke) r.object();
+                    String name = i.callTarget().targetName();
+                    switch (name) {
+                        case "VirtualFrame.getArguments":
+                        case "FrameWithoutBoxing.getArguments":
+                            return null;
+                    }
+                }
+            } else if (receiver instanceof NewArrayNode) {
+                if (receiver.getId() < 30) {
+                    // this should be the stack
+                    return null;
+                }
+            } else if (receiver instanceof LoadFieldNode) {
+                // if it's one of our know fields, we don't need a bounds check
+                LoadFieldNode load = (LoadFieldNode) receiver;
+                // making sure it's what we hope it is, these reads should all be early in the
+                // graphs
+                if (load.getId() < 25) {
                     ResolvedJavaField f = load.field();
                     switch (f.getName()) {
+                        // those are fields on the bytecode loop node
                         case "bytecodesField":
                         case "literalsAndConstantsField":
                         case "inlinedLoopsField":
                         case "quickenedField":
+                        case "arguments": // this is on the FrameWithoutBoxing
                             return null;
                     }
                 }
+            } else if (receiver instanceof Invoke) {
+                Invoke i = (Invoke) receiver;
+                String name = i.callTarget().targetName();
+                switch (name) {
+                    case "VirtualFrame.getArguments":
+                    case "FrameWithoutBoxing.getArguments":
+                        return null;
+                }
             }
+            int i = 0;
         }
 
         if (!needsExplicitBoundsCheckException(receiver, index)) {
@@ -3748,8 +3793,7 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
      * Hook for subclasses to generate custom nodes before an IfNode.
      */
     @SuppressWarnings("unused")
-    protected void postProcessIfNode(ValueNode node) {
-    }
+    protected void postProcessIfNode(ValueNode node) {}
 
     private static BitSet difference(BitSet left, BitSet right) {
         BitSet result = (BitSet) left.clone();
