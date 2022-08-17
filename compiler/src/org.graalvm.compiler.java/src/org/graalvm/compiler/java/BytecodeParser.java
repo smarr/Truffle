@@ -1638,10 +1638,11 @@ public class BytecodeParser extends CoreProvidersDelegate implements GraphBuilde
                     }
                 }
             } else if (receiver instanceof NewArrayNode) {
-                if (receiver.getId() < 30) {
-                    // this should be the stack
-                    return null;
-                }
+                // this should be the stack
+                // and all other arrays should also be save that we create in the bytecode loop
+
+                // if (receiver.getId() < 30) {}
+                return null;
             } else if (receiver instanceof LoadFieldNode) {
                 // if it's one of our know fields, we don't need a bounds check
                 LoadFieldNode load = (LoadFieldNode) receiver;
