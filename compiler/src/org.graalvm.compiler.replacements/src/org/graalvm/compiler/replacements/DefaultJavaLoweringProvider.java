@@ -539,19 +539,10 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
 
         if (graph.isMyBytecodeLoop) {
             // we are sure this is never null... and we are always within bounds
+            array = createNullCheckedValue(array, loadIndexed, tool);
             JavaKind elementKind = loadIndexed.elementKind();
             if (elementKind == JavaKind.Byte) {
-                Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
-
-                ValueNode index = loadIndexed.index();
-                ValueNode positiveIndex = createPositiveIndex(graph, index, null);
-                AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
-
-                ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
-                ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
-
-                loadIndexed.replaceAtUsages(readValue);
-                graph.replaceFixed(loadIndexed, memoryRead);
+                lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                 return;
             } else if (elementKind == JavaKind.Object) {
                 if (array instanceof NewArrayNode) {
@@ -560,17 +551,7 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                     // we're trying to identify all LoadIndexed that access the "stack" array
                     // in the bc loop
                     if (newArr.getId() < 15) {
-                        Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
-
-                        ValueNode index = loadIndexed.index();
-                        ValueNode positiveIndex = createPositiveIndex(graph, index, null);
-                        AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
-
-                        ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
-                        ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
-
-                        loadIndexed.replaceAtUsages(readValue);
-                        graph.replaceFixed(loadIndexed, memoryRead);
+                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                         return;
                     }
                 }
@@ -591,6 +572,22 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
 
         ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
         memoryRead.setGuard(boundsCheck);
+        ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
+
+        loadIndexed.replaceAtUsages(readValue);
+        graph.replaceFixed(loadIndexed, memoryRead);
+    }
+
+    private void lowerWithoutBoundsCheck(LoadIndexedNode loadIndexed,
+                    int arrayBaseOffset, StructuredGraph graph, ValueNode array,
+                    JavaKind elementKind) {
+        Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
+
+        ValueNode index = loadIndexed.index();
+        ValueNode positiveIndex = createPositiveIndex(graph, index, null);
+        AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, elementKind, positiveIndex);
+
+        ReadNode memoryRead = graph.add(new ReadNode(address, NamedLocationIdentity.getArrayLocation(elementKind), loadStamp, BarrierType.NONE, MemoryOrderMode.PLAIN));
         ValueNode readValue = implicitLoadConvert(graph, elementKind, memoryRead);
 
         loadIndexed.replaceAtUsages(readValue);
