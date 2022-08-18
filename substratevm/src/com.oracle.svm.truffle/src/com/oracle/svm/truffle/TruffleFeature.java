@@ -117,6 +117,7 @@ import com.oracle.svm.core.deopt.Deoptimizer;
 import com.oracle.svm.core.feature.InternalFeature;
 import com.oracle.svm.core.graal.meta.RuntimeConfiguration;
 import com.oracle.svm.core.graal.meta.SubstrateForeignCallsProvider;
+import com.oracle.svm.core.graal.phases.RemoveSafetyPhase;
 import com.oracle.svm.core.graal.snippets.NodeLoweringProvider;
 import com.oracle.svm.core.heap.Heap;
 import com.oracle.svm.core.option.HostedOptionKey;
@@ -362,7 +363,7 @@ public class TruffleFeature implements InternalFeature {
         GraphBuilderConfiguration graphBuilderConfig = partialEvaluator.getGraphBuilderConfigPrototype();
 
         TruffleAllowInliningPredicate allowInliningPredicate = new TruffleAllowInliningPredicate(runtimeCompilationFeature.getHostedProviders().getReplacements(),
-                        graphBuilderConfig.getPlugins().getInvocationPlugins(),
+                                            graphBuilderConfig.getPlugins().getInvocationPlugins(),
                         partialEvaluator, this::allowRuntimeCompilation);
         runtimeCompilationFeature.registerAllowInliningPredicate(allowInliningPredicate::allowInlining);
 
@@ -969,6 +970,7 @@ public class TruffleFeature implements InternalFeature {
          * TruffleCommunityCompilerConfiguration.
          */
         if (hosted && HostInliningPhase.Options.TruffleHostInlining.getValue(HostedOptionValues.singleton()) && suites.getHighTier() instanceof HighTier) {
+            suites.getHighTier().prependPhase(new RemoveSafetyPhase(CanonicalizerPhase.create()));
             suites.getHighTier().prependPhase(new SubstrateHostInliningPhase(CanonicalizerPhase.create()));
         }
         /*
