@@ -4,6 +4,7 @@ import org.graalvm.collections.EconomicSet;
 import org.graalvm.compiler.core.common.type.StampFactory;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.IfNode;
+import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.LogicConstantNode;
 import org.graalvm.compiler.nodes.PiNode;
 import org.graalvm.compiler.nodes.StructuredGraph;
@@ -49,11 +50,6 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     }
                 }
             }
-        } else if (node.getValue() instanceof LoadFieldNode) {
-            LoadFieldNode field = (LoadFieldNode) node.getValue();
-            if (field.field().getName().equals("send")) {
-                notRelevant = true;
-            }
         } else if (node.getValue() instanceof LoadIndexedNode) {
             LoadIndexedNode load = (LoadIndexedNode) node.getValue();
             if (load.array() instanceof LoadFieldNode) {
@@ -90,6 +86,27 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     case "indexedLocals":
                     case "descriptor":
                     case "dispatchNode":
+                    case "storageLocations":
+                    case "objectLayout":
+                    case "storage":
+                    case "arguments":
+                    case "send":
+                    case "layout":
+                    case "latestLayoutForClass":
+                        if (removeTestOfIsNull(graph, node, context)) {
+                            return;
+                        }
+                }
+            } else if (node.getValue() instanceof Invoke) {
+                Invoke i = (Invoke) node.getValue();
+                String name = i.callTarget().targetName();
+                switch (name) {
+                    case "BytecodeLoopNode.determineContext":
+                    case "BytecodeLoopNode.determineOuterContext":
+                    case "BytecodeLoopNode.getHolder":
+                    case "BytecodeLoopNode.createRead":
+                    case "BytecodeLoopNode.createWrite":
+                    case "MessageSendNode.createSuperSend":
                         if (removeTestOfIsNull(graph, node, context)) {
                             return;
                         }
