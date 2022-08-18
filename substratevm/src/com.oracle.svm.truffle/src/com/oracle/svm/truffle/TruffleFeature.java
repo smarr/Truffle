@@ -139,6 +139,7 @@ import com.oracle.svm.core.deopt.Deoptimizer;
 import com.oracle.svm.core.feature.InternalFeature;
 import com.oracle.svm.core.graal.meta.RuntimeConfiguration;
 import com.oracle.svm.core.graal.meta.SubstrateForeignCallsProvider;
+import com.oracle.svm.core.graal.phases.RemoveBoundsChecksPhase;
 import com.oracle.svm.core.graal.phases.RemoveSafetyPhase;
 import com.oracle.svm.core.graal.snippets.NodeLoweringProvider;
 import com.oracle.svm.core.heap.Heap;
@@ -965,6 +966,7 @@ public class TruffleFeature implements InternalFeature {
         if (hosted && TruffleHostInliningPhase.Options.TruffleHostInlining.getValue(HostedOptionValues.singleton()) && suites.getHighTier() instanceof HighTier) {
             suites.getHighTier().prependPhase(new RemoveSafetyPhase(CanonicalizerPhase.create()));
             suites.getHighTier().prependPhase(new SubstrateTruffleHostInliningPhase(CanonicalizerPhase.create()));
+            suites.getHighTier().appendPhase(new RemoveBoundsChecksPhase(CanonicalizerPhase.create()));
         }
     }
 }
