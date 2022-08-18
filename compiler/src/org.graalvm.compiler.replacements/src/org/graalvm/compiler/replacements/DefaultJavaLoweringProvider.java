@@ -547,14 +547,8 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                 return;
             } else if (elementKind == JavaKind.Object) {
                 if (array instanceof NewArrayNode) {
-                    NewArrayNode newArr = (NewArrayNode) array;
-                    // this is a wild guess, to make it slightly more reliable
-                    // we're trying to identify all LoadIndexed that access the "stack" array
-                    // in the bc loop
-                    if (newArr.getId() < 30) {
-                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
-                        return;
-                    }
+                    lowerLoadWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                    return;
                 } else if (array instanceof LoadFieldNode) {
                     if (array.getId() < 30) {
                         lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
