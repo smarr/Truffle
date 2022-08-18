@@ -541,7 +541,6 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
 
         if (graph.isMyBytecodeLoop) {
             // we are sure this is never null... and we are always within bounds
-            array = createNullCheckedValue(array, loadIndexed, tool);
             JavaKind elementKind = loadIndexed.elementKind();
             if (elementKind == JavaKind.Byte) {
                 lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
