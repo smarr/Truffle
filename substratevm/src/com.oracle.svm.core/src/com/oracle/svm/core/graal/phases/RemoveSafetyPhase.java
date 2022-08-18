@@ -131,7 +131,7 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         if (node.getUsageCount() == 1) {
             if (node.singleUsage() instanceof IfNode) {
                 IfNode ifNode = (IfNode) node.singleUsage();
-                ifNode.setCondition(LogicConstantNode.forBoolean(false, graph));
+                ifNode.setCondition(LogicConstantNode.contradiction());
 
                 EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
                 canonicalizableNodes.add(ifNode);
