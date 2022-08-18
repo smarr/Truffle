@@ -656,12 +656,21 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
 
         ValueNode value = storeIndexed.value();
         ValueNode array = storeIndexed.array();
+        JavaKind storageKind = storeIndexed.elementKind();
+
+        if (graph.isMyBytecodeLoop) {
+            if (storageKind == JavaKind.Object) {
+                if (array instanceof NewArrayNode) {
+                    // this is the stack, or the arrays used to pass arguments to calls
+                    lowerStoreWithoutBoundsCheck(storeIndexed, value, array, graph, storageKind, arrayBaseOffset);
+                    return;
+                }
+            }
+        }
 
         array = this.createNullCheckedValue(array, storeIndexed, tool);
 
         GuardingNode boundsCheck = getBoundsCheck(storeIndexed, array, tool);
-
-        JavaKind storageKind = storeIndexed.elementKind();
 
         LogicNode condition = null;
         if (storeIndexed.getStoreCheck() == null && storageKind == JavaKind.Object && !StampTool.isPointerAlwaysNull(value)) {
@@ -699,6 +708,23 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
         if (condition != null) {
             tool.createGuard(storeIndexed, condition, DeoptimizationReason.ArrayStoreException, DeoptimizationAction.InvalidateReprofile);
         }
+        memoryWrite.setStateAfter(storeIndexed.stateAfter());
+        graph.replaceFixedWithFixed(storeIndexed, memoryWrite);
+    }
+
+    protected void lowerStoreWithoutBoundsCheck(StoreIndexedNode storeIndexed, ValueNode value, ValueNode array, StructuredGraph graph, JavaKind storageKind, int arrayBaseOffset) {
+        assert storageKind == JavaKind.Object;
+
+        Node pred = storeIndexed.predecessor();
+        while (!(pred instanceof BeginNode) && pred != null) {
+            pred = pred.predecessor();
+        }
+
+        BarrierType barrierType = barrierSet.arrayStoreBarrierType(storageKind);
+        ValueNode positiveIndex = createPositiveIndex(graph, storeIndexed.index(), (BeginNode) pred);
+        AddressNode address = createArrayAddress(graph, array, arrayBaseOffset, storageKind, positiveIndex);
+        WriteNode memoryWrite = graph.add(new WriteNode(address, NamedLocationIdentity.getArrayLocation(storageKind), implicitStoreConvert(graph, storageKind, value),
+                        barrierType, MemoryOrderMode.PLAIN));
         memoryWrite.setStateAfter(storeIndexed.stateAfter());
         graph.replaceFixedWithFixed(storeIndexed, memoryWrite);
     }
