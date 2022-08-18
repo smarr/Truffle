@@ -572,9 +572,31 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                                     case "inlinedLoopsField":
                                     case "quickenedField":
                                     case "arguments": // this is on the FrameWithoutBoxing
-                                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                                    case "storageLocations": // ObjectLayout
+                                        lowerLoadWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                                         return;
                                 }
+                            }
+                        }
+                    }
+                } else if (array instanceof CompressionNode) {
+                    CompressionNode c = (CompressionNode) array;
+                    ValueNode value = c.getValue();
+                    if (value instanceof ReadNode) {
+                        ReadNode read = (ReadNode) value;
+                        if (read.getLocationIdentity() instanceof FieldLocationIdentity) {
+                            FieldLocationIdentity field = (FieldLocationIdentity) read.getLocationIdentity();
+                            String name = field.getField().getName();
+                            switch (name) {
+                                // those are fields on the bytecode loop node
+                                case "bytecodesField":
+                                case "literalsAndConstantsField":
+                                case "inlinedLoopsField":
+                                case "quickenedField":
+                                case "arguments": // this is on the FrameWithoutBoxing
+                                case "storageLocations": // ObjectLayout
+                                    lowerLoadWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                                    return;
                             }
                         }
                     }
