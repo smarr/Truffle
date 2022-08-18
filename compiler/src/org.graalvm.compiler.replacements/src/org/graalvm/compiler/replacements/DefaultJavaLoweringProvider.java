@@ -543,7 +543,7 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
             // we are sure this is never null... and we are always within bounds
             JavaKind elementKind = loadIndexed.elementKind();
             if (elementKind == JavaKind.Byte) {
-                lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                lowerLoadWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                 return;
             } else if (elementKind == JavaKind.Object) {
                 if (array instanceof NewArrayNode) {
@@ -551,7 +551,7 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
                     return;
                 } else if (array instanceof LoadFieldNode) {
                     if (array.getId() < 30) {
-                        lowerWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
+                        lowerLoadWithoutBoundsCheck(loadIndexed, arrayBaseOffset, graph, array, elementKind);
                         return;
                     }
                 } else if (array instanceof PiNode) {
@@ -602,7 +602,7 @@ public abstract class DefaultJavaLoweringProvider implements LoweringProvider {
         graph.replaceFixed(loadIndexed, memoryRead);
     }
 
-    private void lowerWithoutBoundsCheck(LoadIndexedNode loadIndexed,
+    private void lowerLoadWithoutBoundsCheck(LoadIndexedNode loadIndexed,
                     int arrayBaseOffset, StructuredGraph graph, ValueNode array,
                     JavaKind elementKind) {
         Stamp loadStamp = loadStamp(loadIndexed.stamp(NodeView.DEFAULT), elementKind);
