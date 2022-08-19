@@ -140,7 +140,7 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
         return false;
     }
 
-    private boolean isLikelyAKindOfBoundsCheckException(FixedNode node) {
+    private static boolean isLikelyAKindOfBoundsCheckException(FixedNode node) {
         if (node instanceof ThrowBytecodeExceptionNode) {
             return true;
         }
@@ -156,8 +156,17 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
 
     private boolean removeExceptionBranch(boolean exceptionBranch, ReadNode arrayLengthRead, IntegerBelowNode intBelow, FixedNode bytecodeException, IfNode ifNode, StructuredGraph graph,
                     HighTierContext context) {
+        boolean isDeopt = bytecodeException instanceof DeoptimizeNode;
+
         // now check that the arrayLengthRead is used as we expect it
-        if (arrayLengthRead.getUsageCount() == 2) {
+        if (isDeopt) {
+            if (arrayLengthRead.getUsageCount() != 1 || arrayLengthRead.singleUsage() != intBelow) {
+                return false;
+            }
+        } else {
+            if (arrayLengthRead.getUsageCount() != 2) {
+                return false;
+            }
             for (Node u : arrayLengthRead.usages()) {
                 if (u != bytecodeException && u != intBelow) {
                     // we expect the arrayLengthRead to be used by intBelow and
@@ -165,28 +174,27 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                     return false;
                 }
             }
-
-            // now we can start messing with things
-            // we start replacing things, by dropping the if
-            boolean branchToKeep = !exceptionBranch;
-            ifNode.setCondition(LogicConstantNode.forBoolean(branchToKeep));
-
-            EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
-            canonicalizableNodes.add(ifNode);
-
-            canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
-
-            // normally, I'd expect these to already have been removed, but who
-            // knows
-            arrayLengthRead.removeUsage(intBelow);
-            arrayLengthRead.removeUsage(bytecodeException);
-
-            // now it should be safe to drop these
-            intBelow.safeDelete();
-            graph.removeFixed(arrayLengthRead);
-            return true;
         }
 
-        return false;
+        // now we can start messing with things
+        // we start replacing things, by dropping the if
+        boolean branchToKeep = !exceptionBranch;
+        ifNode.setCondition(LogicConstantNode.forBoolean(branchToKeep));
+
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+
+        // normally, I'd expect these to already have been removed, but who
+        // knows
+        arrayLengthRead.removeUsage(intBelow);
+        arrayLengthRead.removeUsage(bytecodeException);
+
+        // now it should be safe to drop these
+        intBelow.safeDelete();
+        graph.removeFixed(arrayLengthRead);
+        return true;
+
     }
 }
