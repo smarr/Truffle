@@ -4,6 +4,7 @@ import org.graalvm.collections.EconomicSet;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.BeginNode;
 import org.graalvm.compiler.nodes.ConstantNode;
+import org.graalvm.compiler.nodes.DeoptimizeNode;
 import org.graalvm.compiler.nodes.FieldLocationIdentity;
 import org.graalvm.compiler.nodes.FixedNode;
 import org.graalvm.compiler.nodes.FrameState;
@@ -20,6 +21,8 @@ import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
 
 import com.oracle.svm.core.graal.nodes.ThrowBytecodeExceptionNode;
+
+import jdk.vm.ci.meta.DeoptimizationReason;
 
 public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
     protected final CanonicalizerPhase canonicalizer;
@@ -119,46 +122,71 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                         }
                     }
                 } else {
-                    // handle the normal array bounds case
-                    if (ifNode.trueSuccessor() instanceof BeginNode) {
+                    // handle the normal array bounds case, where the length is smaller than the
+                    // index
+                    if (ifNode.trueSuccessor() instanceof BeginNode && isLikelyAKindOfBoundsCheckException(ifNode.trueSuccessor().next())) {
                         BeginNode begin = (BeginNode) ifNode.trueSuccessor();
-                        FixedNode maybeBytecodeException = begin.next();
-
-                        if (maybeBytecodeException instanceof ThrowBytecodeExceptionNode) {
-                            // now check that the arrayLengthRead is used as we expect it
-                            if (arrayLengthRead.getUsageCount() == 2) {
-                                for (Node u : arrayLengthRead.usages()) {
-                                    if (u != maybeBytecodeException && u != intBelow) {
-                                        // we expect the arrayLengthRead to be used by intBelow and
-                                        // maybeBytecodeException
-                                        return false;
-                                    }
-                                }
-
-                                // now we can start messing with things
-                                // we start replacing things, by dropping the if
-                                ifNode.setCondition(LogicConstantNode.contradiction());
-
-                                EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
-                                canonicalizableNodes.add(ifNode);
-
-                                canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
-
-                                // normally, I'd expect these to already have been removed, but who
-                                // knows
-                                arrayLengthRead.removeUsage(intBelow);
-                                arrayLengthRead.removeUsage(maybeBytecodeException);
-
-                                // now it should be safe to drop these
-                                intBelow.safeDelete();
-                                graph.removeFixed(arrayLengthRead);
-                                return true;
-                            }
-                        }
+                        FixedNode bytecodeException = begin.next();
+                        return removeExceptionBranch(true, arrayLengthRead, intBelow, bytecodeException, ifNode, graph, context);
+                    } else if (ifNode.falseSuccessor() instanceof BeginNode && isLikelyAKindOfBoundsCheckException(ifNode.falseSuccessor().next())) {
+                        // handle the case where the index is smaller than the length
+                        BeginNode begin = (BeginNode) ifNode.falseSuccessor();
+                        FixedNode bytecodeException = begin.next();
+                        return removeExceptionBranch(false, arrayLengthRead, intBelow, bytecodeException, ifNode, graph, context);
                     }
                 }
             }
         }
+        return false;
+    }
+
+    private boolean isLikelyAKindOfBoundsCheckException(FixedNode node) {
+        if (node instanceof ThrowBytecodeExceptionNode) {
+            return true;
+        }
+
+        if (node instanceof DeoptimizeNode) {
+            DeoptimizeNode deopt = (DeoptimizeNode) node;
+            if (deopt.getReason() == DeoptimizationReason.BoundsCheckException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean removeExceptionBranch(boolean exceptionBranch, ReadNode arrayLengthRead, IntegerBelowNode intBelow, FixedNode bytecodeException, IfNode ifNode, StructuredGraph graph,
+                    HighTierContext context) {
+        // now check that the arrayLengthRead is used as we expect it
+        if (arrayLengthRead.getUsageCount() == 2) {
+            for (Node u : arrayLengthRead.usages()) {
+                if (u != bytecodeException && u != intBelow) {
+                    // we expect the arrayLengthRead to be used by intBelow and
+                    // maybeBytecodeException
+                    return false;
+                }
+            }
+
+            // now we can start messing with things
+            // we start replacing things, by dropping the if
+            boolean branchToKeep = !exceptionBranch;
+            ifNode.setCondition(LogicConstantNode.forBoolean(branchToKeep));
+
+            EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+            canonicalizableNodes.add(ifNode);
+
+            canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+
+            // normally, I'd expect these to already have been removed, but who
+            // knows
+            arrayLengthRead.removeUsage(intBelow);
+            arrayLengthRead.removeUsage(bytecodeException);
+
+            // now it should be safe to drop these
+            intBelow.safeDelete();
+            graph.removeFixed(arrayLengthRead);
+            return true;
+        }
+
         return false;
     }
 }
