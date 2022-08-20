@@ -3,12 +3,15 @@ package com.oracle.svm.core.graal.phases;
 import org.graalvm.collections.EconomicSet;
 import org.graalvm.compiler.core.common.type.StampFactory;
 import org.graalvm.compiler.graph.Node;
+import org.graalvm.compiler.nodes.BeginNode;
 import org.graalvm.compiler.nodes.IfNode;
 import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.LogicConstantNode;
 import org.graalvm.compiler.nodes.PiNode;
 import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.nodes.calc.IsNullNode;
+import org.graalvm.compiler.nodes.extended.BytecodeExceptionNode;
+import org.graalvm.compiler.nodes.java.InstanceOfNode;
 import org.graalvm.compiler.nodes.java.LoadFieldNode;
 import org.graalvm.compiler.nodes.java.LoadIndexedNode;
 import org.graalvm.compiler.nodes.java.NewArrayNode;
@@ -33,11 +36,75 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         for (Node n : graph.getNodes()) {
             if (n instanceof IsNullNode) {
                 processIsNull(graph, (IsNullNode) n, context);
+            } else if (n instanceof InstanceOfNode) {
+                processInstanceOf(graph, (InstanceOfNode) n, context);
             }
         }
     }
 
+    private boolean processInstanceOf(StructuredGraph graph, InstanceOfNode node, HighTierContext context) {
+        if (!node.hasExactlyOneUsage()) {
+            return false;
+        }
+
+        if (!(node.singleUsage() instanceof IfNode)) {
+            return false;
+        }
+
+        IfNode ifNode = (IfNode) node.singleUsage();
+        if (!(ifNode.falseSuccessor() instanceof BeginNode)) {
+            return false;
+        }
+
+        BeginNode falseBranch = (BeginNode) ifNode.falseSuccessor();
+        if (!(falseBranch.next() instanceof BytecodeExceptionNode)) {
+            return false;
+        }
+
+        ifNode.setCondition(LogicConstantNode.tautology());
+
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+        node.safeDelete();
+        return true;
+    }
+
+    private boolean processNullWithNPE(StructuredGraph graph, IsNullNode node, HighTierContext context) {
+        if (!node.hasExactlyOneUsage()) {
+            return false;
+        }
+
+        if (!(node.singleUsage() instanceof IfNode)) {
+            return false;
+        }
+
+        IfNode ifNode = (IfNode) node.singleUsage();
+        if (!(ifNode.trueSuccessor() instanceof BeginNode)) {
+            return false;
+        }
+
+        BeginNode falseBranch = (BeginNode) ifNode.trueSuccessor();
+        if (!(falseBranch.next() instanceof BytecodeExceptionNode)) {
+            return false;
+        }
+
+        ifNode.setCondition(LogicConstantNode.contradiction());
+
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+        node.safeDelete();
+        return true;
+    }
+
     private void processIsNull(StructuredGraph graph, IsNullNode node, HighTierContext context) {
+        if (processNullWithNPE(graph, node, context)) {
+            return;
+        }
+
         boolean notRelevant = false;
         if (node.getValue() instanceof PiNode) {
             PiNode pi = (PiNode) node.getValue();
