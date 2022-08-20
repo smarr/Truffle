@@ -3,7 +3,6 @@ package com.oracle.svm.core.graal.phases;
 import org.graalvm.collections.EconomicSet;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.BeginNode;
-import org.graalvm.compiler.nodes.ConstantNode;
 import org.graalvm.compiler.nodes.DeoptimizeNode;
 import org.graalvm.compiler.nodes.FieldLocationIdentity;
 import org.graalvm.compiler.nodes.FixedNode;
@@ -14,7 +13,9 @@ import org.graalvm.compiler.nodes.NamedLocationIdentity;
 import org.graalvm.compiler.nodes.PiNode;
 import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.nodes.ValueNode;
+import org.graalvm.compiler.nodes.calc.CompareNode;
 import org.graalvm.compiler.nodes.calc.IntegerBelowNode;
+import org.graalvm.compiler.nodes.calc.IntegerEqualsNode;
 import org.graalvm.compiler.nodes.memory.ReadNode;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
@@ -40,13 +41,15 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
         for (Node n : graph.getNodes()) {
             if (n instanceof IntegerBelowNode) {
                 processBounds(graph, (IntegerBelowNode) n, context);
+            } else if (n instanceof IntegerEqualsNode) {
+                processBounds(graph, (IntegerEqualsNode) n, context);
             }
         }
     }
 
-    private boolean processBounds(StructuredGraph graph, IntegerBelowNode intBelow, HighTierContext context) {
-        ValueNode x = intBelow.getX();
-        ValueNode y = intBelow.getY();
+    private boolean processBounds(StructuredGraph graph, CompareNode compare, HighTierContext context) {
+        ValueNode x = compare.getX();
+        ValueNode y = compare.getY();
 
         ReadNode arrayLengthRead = null;
         boolean numArgsCase = false;
@@ -77,9 +80,9 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
             }
         }
 
-        if (arrayLengthRead != null && intBelow.hasExactlyOneUsage()) {
-            if (intBelow.singleUsage() instanceof IfNode) {
-                IfNode ifNode = (IfNode) intBelow.singleUsage();
+        if (arrayLengthRead != null && compare.hasExactlyOneUsage()) {
+            if (compare.singleUsage() instanceof IfNode) {
+                IfNode ifNode = (IfNode) compare.singleUsage();
 
                 if (numArgsCase) {
                     if (ifNode.falseSuccessor() instanceof BeginNode) {
@@ -92,7 +95,7 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                             if (arrayLengthRead.getUsageCount() == 4) {
                                 int foundNodes = 0;
                                 for (Node u : arrayLengthRead.usages()) {
-                                    if (u == maybeBytecodeException || u == intBelow || u instanceof FrameState || u instanceof PiNode) {
+                                    if (u == maybeBytecodeException || u == compare || u instanceof FrameState || u instanceof PiNode) {
                                         foundNodes += 1;
                                     }
                                 }
@@ -112,11 +115,11 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
 
                                 // normally, I'd expect these to already have been removed, but who
                                 // knows
-                                arrayLengthRead.removeUsage(intBelow);
+                                arrayLengthRead.removeUsage(compare);
                                 arrayLengthRead.removeUsage(maybeBytecodeException);
 
                                 // now it should be safe to drop these
-                                intBelow.safeDelete();
+                                compare.safeDelete();
                                 return true;
                             }
                         }
@@ -127,12 +130,12 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                     if (ifNode.trueSuccessor() instanceof BeginNode && isLikelyAKindOfBoundsCheckException(ifNode.trueSuccessor().next())) {
                         BeginNode begin = (BeginNode) ifNode.trueSuccessor();
                         FixedNode bytecodeException = begin.next();
-                        return removeExceptionBranch(true, arrayLengthRead, intBelow, bytecodeException, ifNode, graph, context);
+                        return removeExceptionBranch(true, arrayLengthRead, compare, bytecodeException, ifNode, graph, context);
                     } else if (ifNode.falseSuccessor() instanceof BeginNode && isLikelyAKindOfBoundsCheckException(ifNode.falseSuccessor().next())) {
                         // handle the case where the index is smaller than the length
                         BeginNode begin = (BeginNode) ifNode.falseSuccessor();
                         FixedNode bytecodeException = begin.next();
-                        return removeExceptionBranch(false, arrayLengthRead, intBelow, bytecodeException, ifNode, graph, context);
+                        return removeExceptionBranch(false, arrayLengthRead, compare, bytecodeException, ifNode, graph, context);
                     }
                 }
             }
@@ -154,13 +157,13 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
         return false;
     }
 
-    private boolean removeExceptionBranch(boolean exceptionBranch, ReadNode arrayLengthRead, IntegerBelowNode intBelow, FixedNode bytecodeException, IfNode ifNode, StructuredGraph graph,
+    private boolean removeExceptionBranch(boolean exceptionBranch, ReadNode arrayLengthRead, CompareNode compare, FixedNode bytecodeException, IfNode ifNode, StructuredGraph graph,
                     HighTierContext context) {
         boolean isDeopt = bytecodeException instanceof DeoptimizeNode;
 
         // now check that the arrayLengthRead is used as we expect it
         if (isDeopt) {
-            if (arrayLengthRead.getUsageCount() != 1 || arrayLengthRead.singleUsage() != intBelow) {
+            if (arrayLengthRead.getUsageCount() != 1 || arrayLengthRead.singleUsage() != compare) {
                 return false;
             }
         } else {
@@ -168,7 +171,7 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                 return false;
             }
             for (Node u : arrayLengthRead.usages()) {
-                if (u != bytecodeException && u != intBelow) {
+                if (u != bytecodeException && u != compare) {
                     // we expect the arrayLengthRead to be used by intBelow and
                     // maybeBytecodeException
                     return false;
@@ -188,11 +191,11 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
 
         // normally, I'd expect these to already have been removed, but who
         // knows
-        arrayLengthRead.removeUsage(intBelow);
+        arrayLengthRead.removeUsage(compare);
         arrayLengthRead.removeUsage(bytecodeException);
 
         // now it should be safe to drop these
-        intBelow.safeDelete();
+        compare.safeDelete();
         graph.removeFixed(arrayLengthRead);
         return true;
 
