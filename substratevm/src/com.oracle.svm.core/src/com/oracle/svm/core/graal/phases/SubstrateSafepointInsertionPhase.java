@@ -74,7 +74,9 @@ public class SubstrateSafepointInsertionPhase extends LoopSafepointInsertionPhas
             }
         }
 
-        /* Insert loop safepoints. */
-        super.run(graph, context);
+        if (!graph.isMyBytecodeLoop) {
+            /* Insert loop safepoints. */
+            super.run(graph, context);
+        }
     }
 }
