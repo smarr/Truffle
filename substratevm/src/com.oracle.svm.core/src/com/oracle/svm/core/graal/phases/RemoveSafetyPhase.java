@@ -38,8 +38,38 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                 processIsNull(graph, (IsNullNode) n, context);
             } else if (n instanceof InstanceOfNode) {
                 processInstanceOf(graph, (InstanceOfNode) n, context);
+            } else if (n instanceof BytecodeExceptionNode) {
+                processBytecodeException(graph, (BytecodeExceptionNode) n, context);
             }
         }
+    }
+
+    private void processBytecodeException(StructuredGraph graph, BytecodeExceptionNode n, HighTierContext context) {
+        Node possibleBegin = n.predecessor();
+        if (!(possibleBegin instanceof BeginNode)) {
+            return;
+        }
+
+        Node possibleIf = possibleBegin.predecessor();
+        if (!(possibleIf instanceof IfNode)) {
+            return;
+        }
+
+        IfNode ifNode = (IfNode) possibleIf;
+        if (!(ifNode.condition() instanceof IsNullNode)) {
+            return;
+        }
+
+        boolean exceptionOnTrue = ifNode.trueSuccessor() == possibleBegin;
+        if (!exceptionOnTrue) {
+            return;
+        }
+
+        ifNode.setCondition(LogicConstantNode.contradiction());
+
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
     }
 
     private boolean processInstanceOf(StructuredGraph graph, InstanceOfNode node, HighTierContext context) {
@@ -71,7 +101,7 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         return true;
     }
 
-    private boolean processNullWithNPE(StructuredGraph graph, IsNullNode node, HighTierContext context) {
+    private boolean processSingleUseIsNullWithNPE(StructuredGraph graph, IsNullNode node, HighTierContext context) {
         if (!node.hasExactlyOneUsage()) {
             return false;
         }
@@ -101,7 +131,7 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
     }
 
     private void processIsNull(StructuredGraph graph, IsNullNode node, HighTierContext context) {
-        if (processNullWithNPE(graph, node, context)) {
+        if (processSingleUseIsNullWithNPE(graph, node, context)) {
             return;
         }
 
