@@ -16,6 +16,7 @@ import org.graalvm.compiler.nodes.ValueNode;
 import org.graalvm.compiler.nodes.calc.CompareNode;
 import org.graalvm.compiler.nodes.calc.IntegerBelowNode;
 import org.graalvm.compiler.nodes.calc.IntegerEqualsNode;
+import org.graalvm.compiler.nodes.calc.IsNullNode;
 import org.graalvm.compiler.nodes.memory.ReadNode;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
@@ -43,8 +44,34 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                 processBounds(graph, (IntegerBelowNode) n, context);
             } else if (n instanceof IntegerEqualsNode) {
                 processBounds(graph, (IntegerEqualsNode) n, context);
+            } else if (n instanceof ThrowBytecodeExceptionNode) {
+                processBytecodeException(graph, (ThrowBytecodeExceptionNode) n, context);
             }
         }
+    }
+
+    private void processBytecodeException(StructuredGraph graph, ThrowBytecodeExceptionNode n, HighTierContext context) {
+        Node possibleBegin = n.predecessor();
+        if (!(possibleBegin instanceof BeginNode)) {
+            return;
+        }
+
+        Node possibleIf = possibleBegin.predecessor();
+        if (!(possibleIf instanceof IfNode)) {
+            return;
+        }
+
+        IfNode ifNode = (IfNode) possibleIf;
+        boolean exceptionOnTrue = ifNode.trueSuccessor() == possibleBegin;
+        if (exceptionOnTrue) {
+            ifNode.setCondition(LogicConstantNode.contradiction());
+        } else {
+            ifNode.setCondition(LogicConstantNode.tautology());
+        }
+
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
     }
 
     private boolean processBounds(StructuredGraph graph, CompareNode compare, HighTierContext context) {
