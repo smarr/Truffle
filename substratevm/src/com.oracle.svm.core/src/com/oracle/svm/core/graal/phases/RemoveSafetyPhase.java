@@ -4,6 +4,7 @@ import org.graalvm.collections.EconomicSet;
 import org.graalvm.compiler.core.common.type.StampFactory;
 import org.graalvm.compiler.graph.Node;
 import org.graalvm.compiler.nodes.BeginNode;
+import org.graalvm.compiler.nodes.FixedWithNextNode;
 import org.graalvm.compiler.nodes.IfNode;
 import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.LogicConstantNode;
@@ -20,6 +21,7 @@ import org.graalvm.compiler.nodes.java.LoadFieldNode;
 import org.graalvm.compiler.nodes.java.LoadIndexedNode;
 import org.graalvm.compiler.nodes.java.NewArrayNode;
 import org.graalvm.compiler.nodes.java.NewInstanceNode;
+import org.graalvm.compiler.nodes.util.GraphUtil;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
@@ -131,39 +133,48 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         }
 
         ExceptionObjectNode exO;
-        NewInstanceNode newO;
+        NewInstanceNode newArithExceptionInstance;
         if (phi.valueAt(0) instanceof ExceptionObjectNode && phi.valueAt(1) instanceof NewInstanceNode) {
             exO = (ExceptionObjectNode) phi.valueAt(0);
-            newO = (NewInstanceNode) phi.valueAt(1);
+            newArithExceptionInstance = (NewInstanceNode) phi.valueAt(1);
         } else {
-            newO = (NewInstanceNode) phi.valueAt(0);
+            newArithExceptionInstance = (NewInstanceNode) phi.valueAt(0);
             exO = (ExceptionObjectNode) phi.valueAt(1);
         }
 
-        if (n.getCheckedStamp().javaType(context.getMetaAccess()) != newO.instanceClass()) {
+        if (n.getCheckedStamp().javaType(context.getMetaAccess()) != newArithExceptionInstance.instanceClass()) {
             return false;
         }
 
-        BeginNode onExBegin = (BeginNode) ifNode.trueSuccessor();
-        Node whenArtihException = onExBegin.successors().first();
-        whenArtihException needs to loose its predecessor before we can use it as new successor...
+        BeginNode onArithExceptionBegin = (BeginNode) ifNode.trueSuccessor();
+        Node onArithExceptionNode = onArithExceptionBegin.successors().first();
 
-        Node newOPre = newO.predecessor();
+        Node newOPre = newArithExceptionInstance.predecessor();
         if (!(newOPre instanceof BeginNode)) {
             return false;
         }
 
-        BeginNode arithExceptionBranch = (BeginNode) newOPre;
-        arithExceptionBranch.replaceFirstSuccessor(newO, whenArtihException);
+        // ifNode.clearSuccessors();
+        // graph.replaceFixedWithFixed(newArithExceptionBranch, onArithExceptionBegin);
+        // GraphUtil.killCFG(newArithExceptionBranch);
 
-        newO.safeDelete();
+        // first, get rid of the if node so that we don't have to deal with both branches
+        ifNode.setCondition(LogicConstantNode.tautology());
 
-// ifNode.setCondition(LogicConstantNode.tautology());
-//
-// EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
-// canonicalizableNodes.add(ifNode);
-//
-// canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+        EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+        canonicalizableNodes.add(ifNode);
+
+        canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+        n.safeDelete();
+
+        // now unlink the onArithExceptionNode
+        ((FixedWithNextNode) onArithExceptionNode.predecessor()).setNext(null);
+
+        newOPre.replaceFirstSuccessor(newArithExceptionInstance, onArithExceptionNode);
+        GraphUtil.killCFG(newArithExceptionInstance);
+
+        // arithExceptionBranch.replaceFirstSuccessor(newO, whenArtihException);
+        // newArithExceptionInstance.safeDelete();
 
         return true;
 
