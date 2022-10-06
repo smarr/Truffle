@@ -20,6 +20,7 @@ import org.graalvm.compiler.nodes.java.LoadFieldNode;
 import org.graalvm.compiler.nodes.java.LoadIndexedNode;
 import org.graalvm.compiler.nodes.java.NewArrayNode;
 import org.graalvm.compiler.nodes.java.NewInstanceNode;
+import org.graalvm.compiler.nodes.util.GraphUtil;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
@@ -145,6 +146,10 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         }
 
         BeginNode onExBegin = (BeginNode) ifNode.trueSuccessor();
+
+        GraphUtil.unlinkFixedNode(onExBegin);
+        onExBegin.
+
         Node whenArtihException = onExBegin.successors().first();
         whenArtihException needs to loose its predecessor before we can use it as new successor...
 
