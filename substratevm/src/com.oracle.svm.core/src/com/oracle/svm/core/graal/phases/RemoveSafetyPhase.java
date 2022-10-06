@@ -9,15 +9,22 @@ import org.graalvm.compiler.nodes.Invoke;
 import org.graalvm.compiler.nodes.LogicConstantNode;
 import org.graalvm.compiler.nodes.PiNode;
 import org.graalvm.compiler.nodes.StructuredGraph;
+import org.graalvm.compiler.nodes.ValueNode;
+import org.graalvm.compiler.nodes.ValuePhiNode;
+import org.graalvm.compiler.nodes.ValueProxyNode;
 import org.graalvm.compiler.nodes.calc.IsNullNode;
 import org.graalvm.compiler.nodes.extended.BytecodeExceptionNode;
+import org.graalvm.compiler.nodes.java.ExceptionObjectNode;
 import org.graalvm.compiler.nodes.java.InstanceOfNode;
 import org.graalvm.compiler.nodes.java.LoadFieldNode;
 import org.graalvm.compiler.nodes.java.LoadIndexedNode;
 import org.graalvm.compiler.nodes.java.NewArrayNode;
+import org.graalvm.compiler.nodes.java.NewInstanceNode;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
+
+import com.oracle.truffle.api.nodes.ExecutableNode;
 
 public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
 
@@ -82,12 +89,17 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         }
 
         IfNode ifNode = (IfNode) node.singleUsage();
+
         if (!(ifNode.falseSuccessor() instanceof BeginNode)) {
             return false;
         }
 
         BeginNode falseBranch = (BeginNode) ifNode.falseSuccessor();
         if (!(falseBranch.next() instanceof BytecodeExceptionNode)) {
+            String typeName = node.getCheckedStamp().javaType(context.getMetaAccess()).getName();
+            if (typeName.equals("Ljava/lang/ArithmeticException;")) {
+                return processPossibleArithmeticExceptionAsOverflowCheck(graph, node, context, ifNode);
+            }
             return false;
         }
 
@@ -99,6 +111,62 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
         node.safeDelete();
         return true;
+    }
+
+    private boolean processPossibleArithmeticExceptionAsOverflowCheck(StructuredGraph graph, InstanceOfNode n, HighTierContext context, IfNode ifNode) {
+        ValueNode val = n.getValue();
+        if (!(val instanceof ValueProxyNode)) {
+            return false;
+        }
+
+        ValueProxyNode valProx = (ValueProxyNode) val;
+        ValueNode maybePhi = valProx.value();
+        if (!(maybePhi instanceof ValuePhiNode)) {
+            return false;
+        }
+
+        ValuePhiNode phi = (ValuePhiNode) maybePhi;
+        if (phi.valueCount() != 2) {
+            return false;
+        }
+
+        ExceptionObjectNode exO;
+        NewInstanceNode newO;
+        if (phi.valueAt(0) instanceof ExceptionObjectNode && phi.valueAt(1) instanceof NewInstanceNode) {
+            exO = (ExceptionObjectNode) phi.valueAt(0);
+            newO = (NewInstanceNode) phi.valueAt(1);
+        } else {
+            newO = (NewInstanceNode) phi.valueAt(0);
+            exO = (ExceptionObjectNode) phi.valueAt(1);
+        }
+
+        if (n.getCheckedStamp().javaType(context.getMetaAccess()) != newO.instanceClass()) {
+            return false;
+        }
+
+        BeginNode onExBegin = (BeginNode) ifNode.trueSuccessor();
+        Node whenArtihException = onExBegin.successors().first();
+        whenArtihException needs to loose its predecessor before we can use it as new successor...
+
+        Node newOPre = newO.predecessor();
+        if (!(newOPre instanceof BeginNode)) {
+            return false;
+        }
+
+        BeginNode arithExceptionBranch = (BeginNode) newOPre;
+        arithExceptionBranch.replaceFirstSuccessor(newO, whenArtihException);
+
+        newO.safeDelete();
+
+// ifNode.setCondition(LogicConstantNode.tautology());
+//
+// EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+// canonicalizableNodes.add(ifNode);
+//
+// canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+
+        return true;
+
     }
 
     private boolean processSingleUseIsNullWithNPE(StructuredGraph graph, IsNullNode node, HighTierContext context) {
