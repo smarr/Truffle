@@ -65,16 +65,9 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         }
 
         IfNode ifNode = (IfNode) possibleIf;
-        if (!(ifNode.condition() instanceof IsNullNode)) {
-            return;
-        }
 
         boolean exceptionOnTrue = ifNode.trueSuccessor() == possibleBegin;
-        if (!exceptionOnTrue) {
-            return;
-        }
-
-        ifNode.setCondition(LogicConstantNode.contradiction());
+        ifNode.setCondition(LogicConstantNode.forBoolean(!exceptionOnTrue));
 
         EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
         canonicalizableNodes.add(ifNode);
