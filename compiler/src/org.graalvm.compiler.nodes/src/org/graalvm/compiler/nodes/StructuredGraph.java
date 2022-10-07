@@ -386,7 +386,7 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
 // return method.getName().equals("executeGeneric") &&
 // method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
         String className = method.getDeclaringClass().getName();
-        return className.startsWith("Ltrufflesom") || className.startsWith("Lbdt/") || className.startsWith("Ltools/");
+        return className.startsWith("Ltrufflesom") || className.startsWith("Lbdt/") || className.startsWith("Ltools/") || className.startsWith("Lcom/oracle/truffle/llvm") || className.startsWith("Lorg/truffleruby");
     }
 
 // private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
