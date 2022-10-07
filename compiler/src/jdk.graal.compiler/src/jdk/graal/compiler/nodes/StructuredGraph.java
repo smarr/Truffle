@@ -388,8 +388,10 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         if (method == null) {
             return false;
         }
-        return method.getName().equals("executeGeneric") &&
-                        method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
+// return method.getName().equals("executeGeneric") &&
+// method.getDeclaringClass().getName().equals("Ltrufflesom/interpreter/nodes/bc/BytecodeLoopNode;");
+        String className = method.getDeclaringClass().getName();
+        return className.startsWith("Ltrufflesom") || className.startsWith("Lbdt/") || className.startsWith("Ltools/");
     }
 
 // private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
