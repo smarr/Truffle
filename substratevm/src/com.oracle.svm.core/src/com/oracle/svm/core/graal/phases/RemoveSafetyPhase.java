@@ -98,10 +98,10 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
 
         BeginNode falseBranch = (BeginNode) ifNode.falseSuccessor();
         if (!(falseBranch.next() instanceof BytecodeExceptionNode)) {
-            String typeName = node.getCheckedStamp().javaType(context.getMetaAccess()).getName();
-            if (typeName.equals("Ljava/lang/ArithmeticException;")) {
-                return processPossibleArithmeticExceptionAsOverflowCheck(graph, node, context, ifNode);
-            }
+// String typeName = node.getCheckedStamp().javaType(context.getMetaAccess()).getName();
+// if (typeName.equals("Ljava/lang/ArithmeticException;")) {
+// return processPossibleArithmeticExceptionAsOverflowCheck(graph, node, context, ifNode);
+// }
             return false;
         }
 
