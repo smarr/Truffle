@@ -75,6 +75,9 @@ import jdk.internal.misc.Unsafe;
 
 public class SubstrateOptions {
 
+    @Option(help = "Experimental Removal of Java Safety", type = OptionType.Debug) //
+    public static final HostedOptionKey<Boolean> RemoveSafety = new HostedOptionKey<>(true);
+
     @Option(help = "When true, compiler graphs are parsed only once before static analysis. When false, compiler graphs are parsed for static analysis and again for AOT compilation.")//
     public static final HostedOptionKey<Boolean> ParseOnce = new HostedOptionKey<>(true);
     @Option(help = "When true, each compiler graph version (DeoptTarget, AOT, JIT) needed for runtime compilation will be separately analyzed during static analysis." +
