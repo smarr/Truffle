@@ -74,6 +74,9 @@ import jdk.internal.misc.Unsafe;
 
 public class SubstrateOptions {
 
+    @Option(help = "Experimental Removal of Java Safety", type = OptionType.Debug) //
+    public static final HostedOptionKey<Boolean> RemoveSafety = new HostedOptionKey<>(true);
+
     @Option(help = "Deprecated, option no longer has any effect.", deprecated = true, deprecationMessage = "It no longer has any effect, and no replacement is available")//
     static final HostedOptionKey<Boolean> ParseOnce = new HostedOptionKey<>(true);
     @Option(help = "Deprecated, option no longer has any effect.", deprecated = true, deprecationMessage = "It no longer has any effect, and no replacement is available")//

@@ -155,6 +155,8 @@ import com.oracle.svm.core.graal.meta.SubstrateStampProvider;
 import com.oracle.svm.core.graal.phases.CollectDeoptimizationSourcePositionsPhase;
 import com.oracle.svm.core.graal.phases.DeadStoreRemovalPhase;
 import com.oracle.svm.core.graal.phases.OptimizeExceptionPathsPhase;
+import com.oracle.svm.core.graal.phases.RemoveBoundsChecksPhase;
+import com.oracle.svm.core.graal.phases.RemoveSafetyPhase;
 import com.oracle.svm.core.graal.phases.RemoveUnwindPhase;
 import com.oracle.svm.core.graal.phases.SubstrateSafepointInsertionPhase;
 import com.oracle.svm.core.graal.snippets.DeoptTester;
@@ -1547,6 +1549,13 @@ public class NativeImageGenerator {
             /* There is no inlining, so prepend them in reverse order. */
             highTier.prependPhase(new RemoveUnwindPhase());
             highTier.prependPhase(new DeadStoreRemovalPhase());
+        }
+
+        if (SubstrateOptions.RemoveSafety.getValue()) {
+            // Making things Unsafe
+            System.out.println("[RemoveSafety] Compiler Phases to Remove Java Safety enabled.");
+            highTier.prependPhase(new RemoveSafetyPhase(CanonicalizerPhase.create()));
+            highTier.appendPhase(new RemoveBoundsChecksPhase(CanonicalizerPhase.create()));
         }
 
         lowTier.addBeforeLast(new OptimizeExceptionPathsPhase());
