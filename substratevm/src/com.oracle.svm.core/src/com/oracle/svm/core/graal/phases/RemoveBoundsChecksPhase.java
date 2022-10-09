@@ -39,25 +39,35 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
         }
 
         for (Node n : graph.getNodes()) {
+            if (n instanceof ThrowBytecodeExceptionNode) {
+                if (!processBytecodeException(graph, (ThrowBytecodeExceptionNode) n, context)) {
+                    System.out.println("[TBEx not removed] " + graph.method().toString() + " " + n);
+                }
+            }
+        }
+
+        for (Node n : graph.getNodes()) {
             if (n instanceof IntegerBelowNode) {
-                processBounds(graph, (IntegerBelowNode) n, context);
+                if (processBounds(graph, (IntegerBelowNode) n, context)) {
+                    System.out.println("Unexpected triggering of RemBounds on " + n);
+                }
             } else if (n instanceof IntegerEqualsNode) {
-                processBounds(graph, (IntegerEqualsNode) n, context);
-            } else if (n instanceof ThrowBytecodeExceptionNode) {
-                processBytecodeException(graph, (ThrowBytecodeExceptionNode) n, context);
+                if (processBounds(graph, (IntegerEqualsNode) n, context)) {
+                    System.out.println("Unexpected triggering of RemBounds on " + n);
+                }
             }
         }
     }
 
-    private void processBytecodeException(StructuredGraph graph, ThrowBytecodeExceptionNode n, HighTierContext context) {
+    private boolean processBytecodeException(StructuredGraph graph, ThrowBytecodeExceptionNode n, HighTierContext context) {
         Node possibleBegin = n.predecessor();
         if (!(possibleBegin instanceof BeginNode)) {
-            return;
+            return false;
         }
 
         Node possibleIf = possibleBegin.predecessor();
         if (!(possibleIf instanceof IfNode)) {
-            return;
+            return false;
         }
 
         IfNode ifNode = (IfNode) possibleIf;
@@ -71,6 +81,8 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
         EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
         canonicalizableNodes.add(ifNode);
         canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+
+        return true;
     }
 
     private boolean processBounds(StructuredGraph graph, CompareNode compare, HighTierContext context) {
