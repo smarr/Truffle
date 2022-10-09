@@ -43,25 +43,39 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         }
 
         for (Node n : graph.getNodes()) {
+            if (n instanceof BytecodeExceptionNode) {
+                if (!processBytecodeException(graph, (BytecodeExceptionNode) n, context)) {
+                    System.out.println("[BcEx not removed] " + graph.method().toString() + " " + n);
+                }
+            }
+        }
+
+        for (Node n : graph.getNodes()) {
+            if (n.isDeleted()) {
+                continue;
+            }
+
             if (n instanceof IsNullNode) {
-                processIsNull(graph, (IsNullNode) n, context);
+                if (processIsNull(graph, (IsNullNode) n, context)) {
+                    System.out.println("Unexpected triggering of RemIsNull on " + n);
+                }
             } else if (n instanceof InstanceOfNode) {
-                processInstanceOf(graph, (InstanceOfNode) n, context);
-            } else if (n instanceof BytecodeExceptionNode) {
-                processBytecodeException(graph, (BytecodeExceptionNode) n, context);
+                if (processInstanceOf(graph, (InstanceOfNode) n, context)) {
+                    System.out.println("Unexpected triggering of RemInstanceOf on " + n);
+                }
             }
         }
     }
 
-    private void processBytecodeException(StructuredGraph graph, BytecodeExceptionNode n, HighTierContext context) {
+    private boolean processBytecodeException(StructuredGraph graph, BytecodeExceptionNode n, HighTierContext context) {
         Node possibleBegin = n.predecessor();
         if (!(possibleBegin instanceof BeginNode)) {
-            return;
+            return false;
         }
 
         Node possibleIf = possibleBegin.predecessor();
         if (!(possibleIf instanceof IfNode)) {
-            return;
+            return false;
         }
 
         IfNode ifNode = (IfNode) possibleIf;
@@ -72,6 +86,8 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
         canonicalizableNodes.add(ifNode);
         canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
+
+        return true;
     }
 
     private boolean processInstanceOf(StructuredGraph graph, InstanceOfNode node, HighTierContext context) {
@@ -202,9 +218,9 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
         return true;
     }
 
-    private void processIsNull(StructuredGraph graph, IsNullNode node, HighTierContext context) {
+    private boolean processIsNull(StructuredGraph graph, IsNullNode node, HighTierContext context) {
         if (processSingleUseIsNullWithNPE(graph, node, context)) {
-            return;
+            return false;
         }
 
         boolean notRelevant = false;
@@ -236,13 +252,13 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     LoadIndexedNode load = (LoadIndexedNode) pi.object();
                     if (load.array() instanceof NewArrayNode) {
                         if (removeIsNullFromStackReads(graph, node, context, pi)) {
-                            return;
+                            return false;
                         }
                     } else if (load.array() instanceof LoadFieldNode) {
                         LoadFieldNode field = (LoadFieldNode) load.array();
                         if (field.field().getName().equals("literalsAndConstantsField")) {
                             if (removeTestOfIsNull(graph, node, context)) {
-                                return;
+                                return false;
                             }
                         }
                     }
@@ -263,7 +279,7 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     case "layout":
                     case "latestLayoutForClass":
                         if (removeTestOfIsNull(graph, node, context)) {
-                            return;
+                            return true;
                         }
                 }
             } else if (node.getValue() instanceof Invoke) {
@@ -277,13 +293,15 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     case "BytecodeLoopNode.createWrite":
                     case "MessageSendNode.createSuperSend":
                         if (removeTestOfIsNull(graph, node, context)) {
-                            return;
+                            return true;
                         }
                 }
             }
 
             int i = 0;
         }
+
+        return false;
     }
 
     private boolean removeIsNullFromStackReads(StructuredGraph graph, IsNullNode node, HighTierContext context, PiNode pi) {
