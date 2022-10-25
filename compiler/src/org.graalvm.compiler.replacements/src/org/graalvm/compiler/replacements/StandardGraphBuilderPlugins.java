@@ -910,7 +910,6 @@ public class StandardGraphBuilderPlugins {
 
     private static void registerMathPlugins(InvocationPlugins plugins, boolean allowDeoptimization, Replacements replacements, LoweringProvider lowerer) {
         Registration r = new Registration(plugins, Math.class, replacements);
-        if (allowDeoptimization) {
             for (JavaKind kind : new JavaKind[]{JavaKind.Int, JavaKind.Long}) {
                 Class<?> type = kind.toJavaClass();
                 r.register(new InvocationPlugin("decrementExact", type) {
@@ -969,7 +968,6 @@ public class StandardGraphBuilderPlugins {
                     }
                 });
             }
-        }
         r.register(new InvocationPlugin("multiplyHigh", long.class, long.class) {
             @Override
             public boolean apply(GraphBuilderContext b, ResolvedJavaMethod targetMethod, Receiver receiver, ValueNode x, ValueNode y) {
