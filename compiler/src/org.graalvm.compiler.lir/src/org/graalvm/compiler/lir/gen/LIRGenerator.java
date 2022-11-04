@@ -473,7 +473,7 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
         }
     }
 
-    public void emitStrategySwitch(JavaConstant[] keyConstants, double[] keyProbabilities, LabelRef[] keyTargets, LabelRef defaultTarget, AllocatableValue value) {
+    public void emitStrategySwitch(JavaConstant[] keyConstants, double[] keyProbabilities, LabelRef[] keyTargets, LabelRef defaultTarget, AllocatableValue value, boolean isBytecodeLoop) {
         SwitchStrategy strategy = SwitchStrategy.getBestStrategy(keyProbabilities, keyConstants, keyTargets);
 
         int keyCount = keyConstants.length;
@@ -490,10 +490,10 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
          * gradually with additional effort.
          */
         double minDensity = 1 / Math.sqrt(strategy.getAverageEffort());
-        if (strategy.getAverageEffort() < 4d || (tableSwitchDensity < minDensity && hashTableSwitchDensity < minDensity)) {
+        if (!isBytecodeLoop && (strategy.getAverageEffort() < 4d || (tableSwitchDensity < minDensity && hashTableSwitchDensity < minDensity))) {
             emitStrategySwitch(strategy, value, keyTargets, defaultTarget);
         } else {
-            if (hashTableSwitchDensity > tableSwitchDensity) {
+            if (!isBytecodeLoop && (hashTableSwitchDensity > tableSwitchDensity)) {
                 IntHasher h = hasher.get();
                 LabelRef[] targets = new LabelRef[h.cardinality];
                 JavaConstant[] keys = new JavaConstant[h.cardinality];
