@@ -339,6 +339,10 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
 
     private OptimizationLog optimizationLog;
 
+    public final boolean isMyBytecodeLoop;
+    public final boolean isComputeBytecode;
+// public final boolean isBytecodeLoop;
+
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
                     int entryBCI,
@@ -370,7 +374,53 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.inliningLog = GraalOptions.TraceInlining.getValue(options) || OptimizationLog.isOptimizationLogEnabled(options) ? new InliningLog(rootMethod) : null;
         this.callerContext = context;
         this.optimizationLog = OptimizationLog.getInstance(this);
+
+        isMyBytecodeLoop = isMyBytecodeLoop(method);
+        isComputeBytecode = isComputeBytecode(method);
     }
+
+    private static boolean isComputeBytecode(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+        String className = method.getDeclaringClass().getName();
+        return className.contains("ComputeBytecode") && method.getName().startsWith("executeGeneric");
+    }
+
+    private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+        String className = method.getDeclaringClass().getName();
+        if (method.getDeclaringClass().getName().indexOf("/") == -1) {
+            // for classes not in packages, like the AWFY benchmarks.
+            return true;
+        }
+        return className.startsWith("Ltrufflesom") ||
+                        className.startsWith("Lbdt/") ||
+                        className.startsWith("Ltools/") ||
+                        className.startsWith("Lsom/") ||
+                        className.startsWith("Lcd/") ||
+                        className.startsWith("Ldeltablue/") ||
+                        className.startsWith("Lhavlak/") ||
+                        className.startsWith("Ljson/") ||
+                        className.startsWith("Lnbody/") ||
+                        className.startsWith("Lrichards/");
+    }
+
+// private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
+// if (method == null) {
+// return false;
+// }
+//
+// boolean isBcLoop = false;
+// for (Annotation a : method.getAnnotations()) {
+// if (a.annotationType().getSimpleName().equals("BytecodeInterpreterSwitch")) {
+// isBcLoop = true;
+// }
+// }
+// return isBcLoop;
+// }
 
     private static boolean checkIsSubstitutionInvariants(ResolvedJavaMethod method, boolean isSubstitution) {
         if (!IS_IN_NATIVE_IMAGE && !IS_BUILDING_NATIVE_IMAGE) {
