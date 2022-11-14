@@ -78,7 +78,7 @@ public class AMD64Move {
     private abstract static class AbstractMoveOp extends AMD64LIRInstruction implements ValueMoveOp {
         public static final LIRInstructionClass<AbstractMoveOp> TYPE = LIRInstructionClass.create(AbstractMoveOp.class);
 
-        private AMD64Kind moveKind;
+        protected AMD64Kind moveKind;
 
         protected AbstractMoveOp(LIRInstructionClass<? extends AbstractMoveOp> c, AMD64Kind moveKind) {
             super(c);
@@ -102,6 +102,11 @@ public class AMD64Move {
             super(TYPE, moveKind);
             this.result = result;
             this.input = input;
+        }
+
+        public MoveToRegOp(MoveToRegOp move, boolean flipInputAndResult) {
+            this(move.moveKind, move.input, move.result);
+            assert flipInputAndResult;
         }
 
         @Override

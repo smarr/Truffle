@@ -31,6 +31,7 @@ import org.graalvm.compiler.lir.ControlFlowOptimizer;
 import org.graalvm.compiler.lir.EdgeMoveOptimizer;
 import org.graalvm.compiler.lir.NullCheckOptimizer;
 import org.graalvm.compiler.lir.RedundantMoveElimination;
+import org.graalvm.compiler.lir.ThreadedCodeInterpPhase;
 import org.graalvm.compiler.lir.phases.PostAllocationOptimizationPhase.PostAllocationOptimizationContext;
 import org.graalvm.compiler.lir.profiling.MethodProfilingPhase;
 import org.graalvm.compiler.lir.profiling.MoveProfilingPhase;
@@ -84,5 +85,7 @@ public class PostAllocationOptimizationStage extends LIRPhaseSuite<PostAllocatio
         if (!ComputeCodeEmissionOrder.Options.EarlyCodeEmissionOrder.getValue(options)) {
             appendPhase(new ComputeCodeEmissionOrder());
         }
+
+        appendPhase(new ThreadedCodeInterpPhase());
     }
 }

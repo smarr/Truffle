@@ -1753,6 +1753,16 @@ public class LLVMGenerator implements LIRGeneratorTool, SubstrateLIRGenerator {
         }
 
         @Override
+        public LIRInstruction withIndexFromResult(LIRInstruction i, LIRInstruction iWithResult) {
+            return null;
+        }
+        
+        @Override
+        public LIRInstruction makeMoveFromStackToReg(LIRInstruction storeRegToStack) {
+            return null;
+        }
+
+        @Override
         public Variable emitLoad(LIRKind kind, Value address, LIRFrameState state, MemoryOrderMode memoryOrder, MemoryExtendKind extendKind) {
             assert extendKind.isNotExtended();
             assert memoryOrder != MemoryOrderMode.RELEASE && memoryOrder != MemoryOrderMode.RELEASE_ACQUIRE;

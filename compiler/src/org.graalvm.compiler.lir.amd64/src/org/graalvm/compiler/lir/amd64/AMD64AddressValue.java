@@ -101,6 +101,10 @@ public final class AMD64AddressValue extends CompositeValue {
         return new AMD64AddressValue(newKind, base, index, stride, displacement, displacementAnnotation);
     }
 
+    public AMD64AddressValue withIndex(AllocatableValue idx) {
+        return new AMD64AddressValue(getValueKind(), base, idx, stride, displacement);
+    }
+
     private static Register toRegister(AllocatableValue value) {
         if (value.equals(Value.ILLEGAL)) {
             return Register.None;

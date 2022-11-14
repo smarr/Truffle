@@ -149,6 +149,11 @@ public final class ControlFlowGraph implements AbstractControlFlowGraph<Block> {
         return cfg;
     }
 
+    @Override
+    public boolean isComputeBytecodeLoop() {
+        return graph.isComputeBytecode;
+    }
+
     private void identifyBlocks() {
         int numBlocks = 0;
         for (AbstractBeginNode begin : graph.getNodes(AbstractBeginNode.TYPE)) {

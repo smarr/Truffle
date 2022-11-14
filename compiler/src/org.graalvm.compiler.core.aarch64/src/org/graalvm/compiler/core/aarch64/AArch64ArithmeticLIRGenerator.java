@@ -45,6 +45,7 @@ import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.lir.CastValue;
 import org.graalvm.compiler.lir.ConstantValue;
 import org.graalvm.compiler.lir.LIRFrameState;
+import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.Variable;
 import org.graalvm.compiler.lir.aarch64.AArch64AddressValue;
 import org.graalvm.compiler.lir.aarch64.AArch64ArithmeticOp;
@@ -571,6 +572,16 @@ public class AArch64ArithmeticLIRGenerator extends ArithmeticLIRGenerator implem
      */
     private AArch64ArithmeticOp getOpCode(Value val, AArch64ArithmeticOp intOp, AArch64ArithmeticOp floatOp) {
         return isNumericInteger(val.getPlatformKind()) ? intOp : floatOp;
+    }
+
+    @Override
+    public LIRInstruction withIndexFromResult(LIRInstruction i, LIRInstruction iWithResult) {
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeMoveFromStackToReg(LIRInstruction storeRegToStack) {
+        return null;
     }
 
     @Override

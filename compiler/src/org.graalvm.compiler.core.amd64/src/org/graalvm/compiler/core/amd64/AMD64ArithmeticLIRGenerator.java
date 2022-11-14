@@ -110,6 +110,7 @@ import org.graalvm.compiler.core.common.memory.MemoryOrderMode;
 import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.lir.ConstantValue;
 import org.graalvm.compiler.lir.LIRFrameState;
+import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.LIRValueUtil;
 import org.graalvm.compiler.lir.Variable;
 import org.graalvm.compiler.lir.amd64.AMD64AddressValue;
@@ -1195,6 +1196,27 @@ public class AMD64ArithmeticLIRGenerator extends ArithmeticLIRGenerator implemen
 
     protected AMD64LIRGenerator getAMD64LIRGen() {
         return (AMD64LIRGenerator) getLIRGen();
+    }
+
+    @Override
+    public LIRInstruction withIndexFromResult(LIRInstruction i, LIRInstruction iWithResult) {
+        if (i instanceof AMD64Unary.MemoryOp && iWithResult instanceof AMD64Unary.MOp) {
+            AMD64Unary.MemoryOp memOp = (AMD64Unary.MemoryOp) i;
+            AMD64Unary.MOp resultMemOp = (AMD64Unary.MOp) iWithResult;
+
+            return new AMD64Unary.MemoryOp(memOp, resultMemOp.getResult());
+        }
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeMoveFromStackToReg(LIRInstruction storeRegToStack) {
+        if (storeRegToStack instanceof AMD64Move.MoveToRegOp) {
+            AMD64Move.MoveToRegOp regToStack = (AMD64Move.MoveToRegOp) storeRegToStack;
+            return new AMD64Move.MoveToRegOp(regToStack, true);
+        }
+
+        return null;
     }
 
     @Override

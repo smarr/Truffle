@@ -30,8 +30,10 @@ import org.graalvm.compiler.core.common.memory.MemoryExtendKind;
 import org.graalvm.compiler.core.common.memory.MemoryOrderMode;
 import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.lir.LIRFrameState;
+import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.Variable;
 
+import jdk.vm.ci.meta.AllocatableValue;
 import jdk.vm.ci.meta.Value;
 import jdk.vm.ci.meta.ValueKind;
 
@@ -105,6 +107,10 @@ public interface ArithmeticLIRGeneratorTool {
     Value emitBitScanForward(Value operand);
 
     Value emitBitScanReverse(Value operand);
+
+    LIRInstruction withIndexFromResult(LIRInstruction i, LIRInstruction iWithResult);
+
+    LIRInstruction makeMoveFromStackToReg(LIRInstruction regToStack);
 
     Variable emitLoad(LIRKind kind, Value address, LIRFrameState state, MemoryOrderMode memoryOrder, MemoryExtendKind extendKind);
 

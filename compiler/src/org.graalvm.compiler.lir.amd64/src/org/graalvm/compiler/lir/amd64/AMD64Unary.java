@@ -73,6 +73,10 @@ public class AMD64Unary {
             this.value = value;
         }
 
+        public AllocatableValue getResult() {
+            return result;
+        }
+
         @Override
         public void emitCode(CompilationResultBuilder crb, AMD64MacroAssembler masm) {
             AMD64Move.move(crb, masm, result, value);
@@ -167,6 +171,10 @@ public class AMD64Unary {
             this.input = input;
 
             this.state = state;
+        }
+
+        public MemoryOp(MemoryOp old, AllocatableValue index) {
+            this(old.opcode, old.size, old.result, old.input.withIndex(index), old.state);
         }
 
         @Override
