@@ -162,7 +162,7 @@ public final class IntegerSwitchNode extends SwitchNode implements LIRLowerable,
 
     @Override
     public void generate(NodeLIRBuilderTool gen) {
-        gen.emitSwitch(this);
+        gen.emitSwitch(this, threaded);
     }
 
     public AbstractBeginNode successorAtKey(int key) {
@@ -709,5 +709,15 @@ public final class IntegerSwitchNode extends SwitchNode implements LIRLowerable,
             }
         }
         return result;
+    }
+
+    protected boolean threaded = false;
+
+    public boolean threaded() {
+        return this.threaded;
+    }
+
+    public void setThreaded() {
+        this.threaded = true;
     }
 }

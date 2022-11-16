@@ -822,4 +822,23 @@ public class CompilationResultBuilder {
     public List<PendingImplicitException> getPendingImplicitExceptionList() {
         return pendingImplicitExceptionList;
     }
+
+    private int threadedAfterLea = -1;
+    private int threadedJumpTable = -1;
+
+    public void recordThreadedAfterLea(int pos) {
+        this.threadedAfterLea = pos;
+    }
+
+    public void recordThreadedJumpTable(int pos) {
+        this.threadedJumpTable = pos;
+    }
+
+    public int getThreadedAfterLea() {
+        return this.threadedAfterLea;
+    }
+
+    public int getThreadedJumpTable() {
+        return this.threadedJumpTable;
+    }
 }

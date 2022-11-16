@@ -276,7 +276,7 @@ public class BytecodeInterpreterBenchmark extends TruffleBenchmark {
                 // frame.getInt(1)) : "";
                 // System.out.println(bci + i + sum);
 
-                switch (unsafeRead(bc, bci)) {
+                switch (CompilerDirectives.threaded(unsafeRead(bc, bci))) {
                     case BOUNDARY:
                         boundary(null);
                         bci += 1;
@@ -337,8 +337,7 @@ public class BytecodeInterpreterBenchmark extends TruffleBenchmark {
 
             int localIndex;
             while (true) {
-
-                switch (bc[bci]) {
+                switch (CompilerDirectives.threaded(bc[bci])) {
                     case BOUNDARY:
                         boundary(f.materialize());
                         bci += 1;

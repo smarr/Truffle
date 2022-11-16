@@ -574,6 +574,10 @@ public final class CompilerDirectives {
         throw new ShouldNotReachHere(message, cause);
     }
 
+    public static int threaded(int v) {
+        return v;
+    }
+
     @SuppressWarnings("serial")
     static final class ShouldNotReachHere extends AssertionError {
 

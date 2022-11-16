@@ -550,9 +550,9 @@ public abstract class NodeLIRBuilder implements NodeLIRBuilderTool, LIRGeneratio
     }
 
     @Override
-    public void visitEndNode(AbstractEndNode end) {
+    public void visitEndNode(AbstractEndNode end, boolean threaded) {
         AbstractMergeNode merge = end.merge();
-        JumpOp jump = newJumpOp(getLIRBlock(merge));
+        JumpOp jump = newJumpOp(getLIRBlock(merge), threaded);
         jump.setPhiValues(createPhiOut(merge, end));
         append(jump);
     }
@@ -564,8 +564,8 @@ public abstract class NodeLIRBuilder implements NodeLIRBuilderTool, LIRGeneratio
     public void visitLoopEnd(LoopEndNode x) {
     }
 
-    protected JumpOp newJumpOp(LabelRef ref) {
-        return new JumpOp(ref);
+    protected JumpOp newJumpOp(LabelRef ref, boolean threaded) {
+        return new JumpOp(ref, threaded);
     }
 
     protected LIRKind getPhiKind(PhiNode phi) {
@@ -712,7 +712,7 @@ public abstract class NodeLIRBuilder implements NodeLIRBuilderTool, LIRGeneratio
      * implementation.
      */
     @Override
-    public void emitSwitch(SwitchNode x) {
+    public void emitSwitch(SwitchNode x, boolean threaded) {
         assert x.defaultSuccessor() != null;
         LabelRef defaultTarget = getLIRBlock(x.defaultSuccessor());
         int keyCount = x.keyCount();
@@ -738,7 +738,7 @@ public abstract class NodeLIRBuilder implements NodeLIRBuilderTool, LIRGeneratio
                     keyProbabilities[i] = intSwitch.keyProbability(i);
                     assert keyConstants[i].getJavaKind() == keyKind;
                 }
-                gen.emitStrategySwitch(keyConstants, keyProbabilities, keyTargets, defaultTarget, value);
+                gen.emitStrategySwitch(keyConstants, keyProbabilities, keyTargets, defaultTarget, value, threaded);
             } else {
                 // keyKind != JavaKind.Int || !x.isSorted()
                 LabelRef[] keyTargets = new LabelRef[keyCount];

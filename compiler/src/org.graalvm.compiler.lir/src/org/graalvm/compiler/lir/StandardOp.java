@@ -201,18 +201,38 @@ public class StandardOp {
 
         private final LabelRef destination;
 
+        private final boolean threaded;
+
         public JumpOp(LabelRef destination) {
-            this(TYPE, destination);
+            this(TYPE, destination, false);
         }
 
-        protected JumpOp(LIRInstructionClass<? extends JumpOp> c, LabelRef destination) {
+        public JumpOp(LabelRef destination, boolean threaded) {
+            this(TYPE, destination, threaded);
+        }
+
+        protected JumpOp(LIRInstructionClass<? extends JumpOp> c, LabelRef destination, boolean threaded) {
             super(c);
             this.destination = destination;
             this.outgoingValues = Value.NO_VALUES;
+            this.threaded = threaded;
         }
 
         @Override
         public void emitCode(CompilationResultBuilder crb) {
+            if (threaded && !crb.isSuccessorEdge(destination) && destination.label().isBound()) {
+                int start = destination.label().position();
+                if (start != -1 && crb.getThreadedJumpTable() != -1 && start < crb.getThreadedJumpTable()) {
+                    crb.asm.align(16);
+
+                    for (int pos = start; pos < crb.getThreadedJumpTable(); pos++) {
+                        crb.asm.emitByte(crb.asm.getByte(pos));
+                    }
+                    int afterLea = crb.getThreadedAfterLea() + (crb.asm.position() - crb.getThreadedJumpTable());
+                    crb.asm.emitInt(crb.getThreadedJumpTable() - afterLea, afterLea - 4);
+                    return;
+                }
+            }
             if (!crb.isSuccessorEdge(destination)) {
                 crb.asm.jmp(destination.label());
             }

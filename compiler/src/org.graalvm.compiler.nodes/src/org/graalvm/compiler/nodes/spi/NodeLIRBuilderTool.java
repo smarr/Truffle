@@ -60,7 +60,11 @@ public interface NodeLIRBuilderTool extends NodeValueMap {
 
     void emitConditional(ConditionalNode i);
 
-    void emitSwitch(SwitchNode i);
+    default void emitSwitch(SwitchNode i) {
+        emitSwitch(i, false);
+    }
+
+    void emitSwitch(SwitchNode i, boolean threaded);
 
     void emitInvoke(Invoke i);
 
@@ -69,7 +73,11 @@ public interface NodeLIRBuilderTool extends NodeValueMap {
     // Handling of block-end nodes still needs to be unified in the LIRGenerator.
     void visitMerge(AbstractMergeNode i);
 
-    void visitEndNode(AbstractEndNode i);
+    default void visitEndNode(AbstractEndNode i) {
+        visitEndNode(i, false);
+    }
+
+    void visitEndNode(AbstractEndNode i, boolean threaded);
 
     void visitLoopEnd(LoopEndNode i);
 

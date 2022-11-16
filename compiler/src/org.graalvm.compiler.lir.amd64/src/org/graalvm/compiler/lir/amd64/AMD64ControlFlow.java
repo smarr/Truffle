@@ -44,13 +44,13 @@ import java.util.stream.Stream;
 
 import org.graalvm.compiler.asm.Label;
 import org.graalvm.compiler.asm.amd64.AMD64Address;
-import org.graalvm.compiler.core.common.Stride;
 import org.graalvm.compiler.asm.amd64.AMD64Assembler.ConditionFlag;
 import org.graalvm.compiler.asm.amd64.AMD64BaseAssembler.OperandSize;
 import org.graalvm.compiler.asm.amd64.AMD64MacroAssembler;
 import org.graalvm.compiler.code.CompilationResult.JumpTable;
 import org.graalvm.compiler.code.CompilationResult.JumpTable.EntryFormat;
 import org.graalvm.compiler.core.common.NumUtil;
+import org.graalvm.compiler.core.common.Stride;
 import org.graalvm.compiler.core.common.calc.Condition;
 import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.lir.LIRFrameState;
@@ -651,7 +651,9 @@ public class AMD64ControlFlow {
         @Temp({REG, HINT}) protected Value idxScratch;
         @Temp protected Value scratch;
 
-        public RangeTableSwitchOp(final int lowKey, final LabelRef defaultTarget, final LabelRef[] targets, Value index, Variable scratch, Variable idxScratch) {
+        private final boolean threaded;
+
+        public RangeTableSwitchOp(final int lowKey, final LabelRef defaultTarget, final LabelRef[] targets, Value index, Variable scratch, Variable idxScratch, boolean threaded) {
             super(TYPE);
             this.lowKey = lowKey;
             assert defaultTarget != null;
@@ -660,6 +662,7 @@ public class AMD64ControlFlow {
             this.index = index;
             this.scratch = scratch;
             this.idxScratch = idxScratch;
+            this.threaded = threaded;
         }
 
         @Override
@@ -683,6 +686,7 @@ public class AMD64ControlFlow {
             }
 
             // Jump to default target if index is not within the jump table
+            // TODO threaded patch here
             masm.jcc(ConditionFlag.Above, defaultTarget.label());
 
             emitJumpTable(crb, masm, scratchReg, idxScratchReg, lowKey, highKey, Arrays.stream(targets).map(LabelRef::label));
@@ -692,6 +696,8 @@ public class AMD64ControlFlow {
             // Set scratch to address of jump table
             masm.leaq(scratchReg, new AMD64Address(AMD64.rip, 0));
             final int afterLea = masm.position();
+
+            crb.recordThreadedAfterLea(afterLea);
 
             // Load jump table entry into scratch and jump to it
             masm.movslq(idxScratchReg, new AMD64Address(scratchReg, idxScratchReg, Stride.S4, 0));
@@ -704,6 +710,8 @@ public class AMD64ControlFlow {
             // Patch LEA instruction above now that we know the position of the jump table
             // this is ugly but there is no better way to do this given the assembler API
             final int jumpTablePos = masm.position();
+            crb.recordThreadedJumpTable(jumpTablePos);
+
             final int leaDisplacementPosition = afterLea - 4;
             masm.emitInt(jumpTablePos - afterLea, leaDisplacementPosition);
 

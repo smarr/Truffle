@@ -398,7 +398,7 @@ public class NodeLLVMBuilder implements NodeLIRBuilderTool, SubstrateNodeLIRBuil
     }
 
     @Override
-    public void emitSwitch(SwitchNode switchNode) {
+    public void emitSwitch(SwitchNode switchNode, boolean threaded) {
         if (switchNode instanceof TypeSwitchNode) {
             emitTypeSwitch((TypeSwitchNode) switchNode);
             return;
@@ -453,7 +453,7 @@ public class NodeLLVMBuilder implements NodeLIRBuilderTool, SubstrateNodeLIRBuil
     }
 
     @Override
-    public void visitEndNode(AbstractEndNode i) {
+    public void visitEndNode(AbstractEndNode i, boolean threaded) {
         LLVMBasicBlockRef nextBlock = gen.getBlock(i.merge());
         builder.buildBranch(nextBlock);
     }

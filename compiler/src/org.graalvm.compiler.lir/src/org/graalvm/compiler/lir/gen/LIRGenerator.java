@@ -473,7 +473,7 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
         }
     }
 
-    public void emitStrategySwitch(JavaConstant[] keyConstants, double[] keyProbabilities, LabelRef[] keyTargets, LabelRef defaultTarget, AllocatableValue value) {
+    public void emitStrategySwitch(JavaConstant[] keyConstants, double[] keyProbabilities, LabelRef[] keyTargets, LabelRef defaultTarget, AllocatableValue value, boolean threaded) {
         SwitchStrategy strategy = SwitchStrategy.getBestStrategy(keyProbabilities, keyConstants, keyTargets);
 
         int keyCount = keyConstants.length;
@@ -490,7 +490,7 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
          * gradually with additional effort.
          */
         double minDensity = 1 / Math.sqrt(strategy.getAverageEffort());
-        if (strategy.getAverageEffort() < 4d || (tableSwitchDensity < minDensity && hashTableSwitchDensity < minDensity)) {
+        if (strategy.getAverageEffort() < 2d || (tableSwitchDensity < minDensity && hashTableSwitchDensity < minDensity)) {
             emitStrategySwitch(strategy, value, keyTargets, defaultTarget);
         } else {
             if (hashTableSwitchDensity > tableSwitchDensity) {
@@ -517,14 +517,14 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
                 for (int i = 0; i < keyCount; i++) {
                     targets[keyConstants[i].asInt() - minValue] = keyTargets[i];
                 }
-                emitRangeTableSwitch(minValue, defaultTarget, targets, value);
+                emitRangeTableSwitch(minValue, defaultTarget, targets, value, threaded);
             }
         }
     }
 
     public abstract void emitStrategySwitch(SwitchStrategy strategy, AllocatableValue key, LabelRef[] keyTargets, LabelRef defaultTarget);
 
-    protected abstract void emitRangeTableSwitch(int lowKey, LabelRef defaultTarget, LabelRef[] targets, AllocatableValue key);
+    protected abstract void emitRangeTableSwitch(int lowKey, LabelRef defaultTarget, LabelRef[] targets, AllocatableValue key, boolean threaded);
 
     protected abstract void emitHashTableSwitch(JavaConstant[] keys, LabelRef defaultTarget, LabelRef[] targets, AllocatableValue value, Value hash);
 

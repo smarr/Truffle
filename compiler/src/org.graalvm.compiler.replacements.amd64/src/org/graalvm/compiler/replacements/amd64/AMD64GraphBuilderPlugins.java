@@ -86,6 +86,7 @@ import org.graalvm.compiler.replacements.nodes.CountTrailingZerosNode;
 import org.graalvm.compiler.replacements.nodes.EncodeArrayNode;
 import org.graalvm.compiler.replacements.nodes.FusedMultiplyAddNode;
 import org.graalvm.compiler.replacements.nodes.HasNegativesNode;
+import org.graalvm.compiler.replacements.nodes.ThreadedSwitchNode;
 import org.graalvm.compiler.replacements.nodes.UnaryMathIntrinsicNode;
 import org.graalvm.compiler.replacements.nodes.UnaryMathIntrinsicNode.UnaryOperation;
 import org.graalvm.compiler.serviceprovider.JavaVersionUtil;
@@ -119,6 +120,7 @@ public class AMD64GraphBuilderPlugins implements TargetGraphBuilderPlugins {
                 registerMathPlugins(invocationPlugins, arch, replacements);
                 registerArraysEqualsPlugins(invocationPlugins, replacements);
                 registerStringCodingPlugins(invocationPlugins, replacements);
+                registerDirectivePlugins(invocationPlugins, replacements);
             }
         });
     }
@@ -615,6 +617,19 @@ public class AMD64GraphBuilderPlugins implements TargetGraphBuilderPlugins {
                     b.addPush(JavaKind.Int, new EncodeArrayNode(src, dst, len, ISO_8859_1, JavaKind.Char));
                     return true;
                 }
+            }
+        });
+    }
+
+    private static void registerDirectivePlugins(InvocationPlugins plugins, Replacements replacements) {
+        plugins.registerIntrinsificationPredicate(t -> t.getName().equals("Lcom/oracle/truffle/api/CompilerDirectives;"));
+        Registration r = new Registration(plugins, "com.oracle.truffle.api.CompilerDirectives", replacements);
+        r.register(new InvocationPlugin.InlineOnlyInvocationPlugin("threaded", int.class) {
+            @Override
+            public boolean apply(GraphBuilderContext b, ResolvedJavaMethod targetMethod, Receiver receiver, ValueNode input) {
+                ThreadedSwitchNode threadedSwitchNode = b.add(new ThreadedSwitchNode(input));
+                b.push(input.getStackKind(), threadedSwitchNode);
+                return true;
             }
         });
     }
