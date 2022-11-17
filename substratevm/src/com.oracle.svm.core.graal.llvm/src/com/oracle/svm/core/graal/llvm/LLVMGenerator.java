@@ -1761,6 +1761,21 @@ public class LLVMGenerator implements LIRGeneratorTool, SubstrateLIRGenerator {
         public LIRInstruction makeMoveFromStackToReg(LIRInstruction storeRegToStack) {
             return null;
         }
+        
+        @Override
+        public LIRInstruction makeAdaptedCopy(LIRInstruction instruction, Variable inputIndex, Variable result) {
+            return null;
+        }
+        
+        @Override
+        public LIRInstruction makeAdaptedDummy(LIRInstruction instruction, Variable inputIndex, LIRKind dwordKind, LIRKind qwordKind) {
+            return null;
+        }
+        
+        @Override
+        public LIRInstruction makeProper(LIRInstruction dummy, LIRInstruction old) {
+            return null;
+        }
 
         @Override
         public Variable emitLoad(LIRKind kind, Value address, LIRFrameState state, MemoryOrderMode memoryOrder, MemoryExtendKind extendKind) {

@@ -563,6 +563,14 @@ public abstract class LIRGenerator implements LIRGeneratorTool {
      */
     protected abstract JavaConstant zapValueForKind(PlatformKind kind);
 
+    public LIRKind getValueKind(LIRInstruction instruction) {
+        return arithmeticLIRGen.getValueKind(instruction);
+    }
+
+    public LIRKind getResultLIRKind(LIRInstruction instruction) {
+        return arithmeticLIRGen.getResultLIRKind(instruction);
+    }
+
     @Override
     public LIRKind getLIRKind(Stamp stamp) {
         return stamp.getLIRKind(lirKindTool);

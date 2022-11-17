@@ -154,6 +154,11 @@ public final class ControlFlowGraph implements AbstractControlFlowGraph<Block> {
         return graph.isComputeBytecode;
     }
 
+    @Override
+    public boolean isDeoptTarget() {
+        return graph.method().toString().contains("Deopt_Target_Method_Key");
+    }
+
     private void identifyBlocks() {
         int numBlocks = 0;
         for (AbstractBeginNode begin : graph.getNodes(AbstractBeginNode.TYPE)) {
@@ -441,9 +446,7 @@ public final class ControlFlowGraph implements AbstractControlFlowGraph<Block> {
      * {@link ControlFlowGraph#computeFrequencies()} for details.
      */
     private boolean verifyRPOInnerLoopsFirst() {
-        return rpoInnerLoopsFirst(b -> {
-        }, b -> {
-        });
+        return rpoInnerLoopsFirst(b -> {}, b -> {});
     }
 
     /**

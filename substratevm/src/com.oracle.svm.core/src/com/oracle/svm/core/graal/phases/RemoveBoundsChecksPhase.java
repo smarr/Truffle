@@ -16,6 +16,7 @@ import org.graalvm.compiler.nodes.ValueNode;
 import org.graalvm.compiler.nodes.calc.CompareNode;
 import org.graalvm.compiler.nodes.calc.IntegerBelowNode;
 import org.graalvm.compiler.nodes.calc.IntegerEqualsNode;
+import org.graalvm.compiler.nodes.java.NewInstanceNode;
 import org.graalvm.compiler.nodes.memory.ReadNode;
 import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
@@ -55,6 +56,37 @@ public class RemoveBoundsChecksPhase extends BasePhase<HighTierContext> {
                 if (processBounds(graph, (IntegerEqualsNode) n, context)) {
                     System.out.println("Unexpected triggering of RemBounds on " + n);
                 }
+            }
+        }
+
+        if (!graph.isComputeBytecode) {
+            return;
+        }
+
+        for (Node n : graph.getNodes()) {
+            if (n instanceof NewInstanceNode) {
+                NewInstanceNode ni = (NewInstanceNode) n;
+                if (!ni.instanceClass().getName().contains("UnsupportedOperationException")) {
+                    return;
+                }
+
+                if (!(ni.predecessor().predecessor() instanceof IfNode)) {
+                    return;
+                }
+
+                Node niPredecessor = ni.predecessor();
+                IfNode ifNode = (IfNode) ni.predecessor().predecessor();
+
+                boolean exceptionOnTrue = ifNode.trueSuccessor() == niPredecessor;
+                if (exceptionOnTrue) {
+                    ifNode.setCondition(LogicConstantNode.contradiction());
+                } else {
+                    ifNode.setCondition(LogicConstantNode.tautology());
+                }
+
+                EconomicSet<Node> canonicalizableNodes = EconomicSet.create();
+                canonicalizableNodes.add(ifNode);
+                canonicalizer.applyIncremental(graph, context, canonicalizableNodes);
             }
         }
     }

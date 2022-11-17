@@ -54,11 +54,13 @@ import org.graalvm.compiler.core.common.NumUtil;
 import org.graalvm.compiler.core.common.calc.Condition;
 import org.graalvm.compiler.debug.GraalError;
 import org.graalvm.compiler.lir.LIRFrameState;
+import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.LIRInstructionClass;
 import org.graalvm.compiler.lir.LabelRef;
 import org.graalvm.compiler.lir.Opcode;
 import org.graalvm.compiler.lir.StandardOp;
 import org.graalvm.compiler.lir.StandardOp.ImplicitNullCheck;
+import org.graalvm.compiler.lir.StandardOp.RangeTableSwitchDummyOp;
 import org.graalvm.compiler.lir.SwitchStrategy;
 import org.graalvm.compiler.lir.SwitchStrategy.BaseSwitchClosure;
 import org.graalvm.compiler.lir.Variable;
@@ -642,6 +644,27 @@ public class AMD64ControlFlow {
         }
     }
 
+// public static final class RangeTableSwitchDummyOp extends LIRInstruction {
+// public static final LIRInstructionClass<RangeTableSwitchDummyOp> TYPE =
+// LIRInstructionClass.create(RangeTableSwitchDummyOp.class);
+//
+// @Use protected Value index;
+// @Temp({REG, HINT}) protected Value idxScratch;
+// @Temp protected Value scratch;
+//
+// public RangeTableSwitchDummyOp(Value index, Variable scratch, Variable idxScratch) {
+// super(TYPE);
+// this.index = index;
+// this.scratch = scratch;
+// this.idxScratch = idxScratch;
+// }
+//
+// @Override
+// public void emitCode(CompilationResultBuilder crb) {
+// throw new UnsupportedOperationException("should have been replaced before emitting code");
+// }
+// }
+
     public static final class RangeTableSwitchOp extends AMD64BlockEndOp {
         public static final LIRInstructionClass<RangeTableSwitchOp> TYPE = LIRInstructionClass.create(RangeTableSwitchOp.class);
         private final int lowKey;
@@ -660,6 +683,21 @@ public class AMD64ControlFlow {
             this.index = index;
             this.scratch = scratch;
             this.idxScratch = idxScratch;
+        }
+
+        public RangeTableSwitchOp(RangeTableSwitchOp old, Value index, Value idxScratch, Value scratch) {
+            super(TYPE);
+            this.lowKey = old.lowKey;
+            assert old.defaultTarget != null;
+            this.defaultTarget = old.defaultTarget;
+            this.targets = old.targets;
+            this.index = index;
+            this.scratch = scratch;
+            this.idxScratch = idxScratch;
+        }
+
+        public RangeTableSwitchOp(RangeTableSwitchDummyOp dummy, RangeTableSwitchOp old) {
+            this(old, dummy.getIndex(), dummy.getScratch(), dummy.getIndexScratch());
         }
 
         @Override

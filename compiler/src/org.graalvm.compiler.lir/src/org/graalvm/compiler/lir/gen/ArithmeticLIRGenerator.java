@@ -25,6 +25,7 @@
 package org.graalvm.compiler.lir.gen;
 
 import org.graalvm.compiler.core.common.LIRKind;
+import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.Variable;
 import org.graalvm.compiler.options.OptionValues;
 
@@ -115,4 +116,7 @@ public abstract class ArithmeticLIRGenerator implements ArithmeticLIRGeneratorTo
         return emitOr(emitUShr(value, distance), emitShl(value, emitNegate(distance, false)));
     }
 
+    public abstract LIRKind getValueKind(LIRInstruction instruction);
+
+    public abstract LIRKind getResultLIRKind(LIRInstruction instruction);
 }

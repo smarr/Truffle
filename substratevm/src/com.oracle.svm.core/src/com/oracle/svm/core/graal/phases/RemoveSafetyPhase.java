@@ -26,8 +26,6 @@ import org.graalvm.compiler.phases.BasePhase;
 import org.graalvm.compiler.phases.common.CanonicalizerPhase;
 import org.graalvm.compiler.phases.tiers.HighTierContext;
 
-import com.oracle.truffle.api.nodes.ExecutableNode;
-
 public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
 
     protected final CanonicalizerPhase canonicalizer;
@@ -64,6 +62,10 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
                     System.out.println("Unexpected triggering of RemInstanceOf on " + n);
                 }
             }
+        }
+
+        if (graph.isComputeBytecode) {
+            int i = 0;
         }
     }
 

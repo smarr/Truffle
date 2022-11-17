@@ -38,10 +38,12 @@ import org.graalvm.compiler.asm.amd64.AMD64Assembler.AMD64MROp;
 import org.graalvm.compiler.asm.amd64.AMD64Assembler.AMD64RMOp;
 import org.graalvm.compiler.asm.amd64.AMD64BaseAssembler.OperandSize;
 import org.graalvm.compiler.asm.amd64.AMD64MacroAssembler;
+import org.graalvm.compiler.core.common.LIRKind;
 import org.graalvm.compiler.lir.LIRFrameState;
 import org.graalvm.compiler.lir.LIRInstructionClass;
 import org.graalvm.compiler.lir.Opcode;
 import org.graalvm.compiler.lir.StandardOp.ImplicitNullCheck;
+import org.graalvm.compiler.lir.Variable;
 import org.graalvm.compiler.lir.asm.CompilationResultBuilder;
 
 import jdk.vm.ci.meta.AllocatableValue;
@@ -71,6 +73,10 @@ public class AMD64Unary {
 
             this.result = result;
             this.value = value;
+        }
+
+        public MOp(MOp old, Variable value, Variable result) {
+            this(old.opcode, old.size, result, value);
         }
 
         public AllocatableValue getResult() {
@@ -177,6 +183,14 @@ public class AMD64Unary {
             this(old.opcode, old.size, old.result, old.input.withIndex(index), old.state);
         }
 
+        public MemoryOp(MemoryOp old, Variable index, Variable result) {
+            this(old.opcode, old.size, result, old.input.withIndex(index), old.state);
+        }
+
+        public AllocatableValue getResult() {
+            return result;
+        }
+
         @Override
         public void emitCode(CompilationResultBuilder crb, AMD64MacroAssembler masm) {
             if (state != null) {
@@ -192,6 +206,10 @@ public class AMD64Unary {
                 return true;
             }
             return false;
+        }
+
+        public LIRKind getInputValueKind() {
+            return (LIRKind) input.getValueKind();
         }
     }
 }

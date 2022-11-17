@@ -585,6 +585,31 @@ public class AArch64ArithmeticLIRGenerator extends ArithmeticLIRGenerator implem
     }
 
     @Override
+    public LIRKind getValueKind(LIRInstruction instruction) {
+        return null;
+    }
+
+    @Override
+    public LIRKind getResultLIRKind(LIRInstruction instruction) {
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeProper(LIRInstruction dummy, LIRInstruction old) {
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeAdaptedDummy(LIRInstruction instruction, Variable inputIndex, LIRKind dwordKind, LIRKind qwordKind) {
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeAdaptedCopy(LIRInstruction instruction, Variable inputIndex, Variable result) {
+        return null;
+    }
+
+    @Override
     public Variable emitLoad(LIRKind loadKind, Value address, LIRFrameState state, MemoryOrderMode memoryOrder, MemoryExtendKind extendKind) {
         AArch64Kind readKind = (AArch64Kind) loadKind.getPlatformKind();
         Variable result;

@@ -112,6 +112,8 @@ import org.graalvm.compiler.lir.ConstantValue;
 import org.graalvm.compiler.lir.LIRFrameState;
 import org.graalvm.compiler.lir.LIRInstruction;
 import org.graalvm.compiler.lir.LIRValueUtil;
+import org.graalvm.compiler.lir.StandardOp.JumpOp;
+import org.graalvm.compiler.lir.StandardOp.RangeTableSwitchDummyOp;
 import org.graalvm.compiler.lir.Variable;
 import org.graalvm.compiler.lir.amd64.AMD64AddressValue;
 import org.graalvm.compiler.lir.amd64.AMD64Arithmetic.FPDivRemOp;
@@ -119,6 +121,7 @@ import org.graalvm.compiler.lir.amd64.AMD64ArithmeticLIRGeneratorTool;
 import org.graalvm.compiler.lir.amd64.AMD64Binary;
 import org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer;
 import org.graalvm.compiler.lir.amd64.AMD64ClearRegisterOp;
+import org.graalvm.compiler.lir.amd64.AMD64ControlFlow.RangeTableSwitchOp;
 import org.graalvm.compiler.lir.amd64.AMD64MathCopySignOp;
 import org.graalvm.compiler.lir.amd64.AMD64MathCosOp;
 import org.graalvm.compiler.lir.amd64.AMD64MathExpOp;
@@ -1216,6 +1219,61 @@ public class AMD64ArithmeticLIRGenerator extends ArithmeticLIRGenerator implemen
             return new AMD64Move.MoveToRegOp(regToStack, true);
         }
 
+        return null;
+    }
+
+    @Override
+    public LIRKind getValueKind(LIRInstruction instruction) {
+        if (instruction instanceof AMD64Unary.MemoryOp) {
+            AMD64Unary.MemoryOp i = (AMD64Unary.MemoryOp) instruction;
+            return (LIRKind) i.getInputValueKind();
+        }
+        return null;
+    }
+
+    @Override
+    public LIRKind getResultLIRKind(LIRInstruction instruction) {
+        if (instruction instanceof AMD64Unary.MOp) {
+            AMD64Unary.MOp i = (AMD64Unary.MOp) instruction;
+            return (LIRKind) i.getResult().getValueKind();
+        }
+        if (instruction instanceof AMD64Unary.MemoryOp) {
+            return (LIRKind) ((AMD64Unary.MemoryOp) instruction).getResult().getValueKind();
+        }
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeAdaptedDummy(LIRInstruction instruction, Variable inputIndex, LIRKind dwordKind, LIRKind qwordKind) {
+        if (instruction instanceof JumpOp) {
+            JumpOp jump = (JumpOp) instruction;
+            Variable idxScratch = getLIRGen().newVariable(dwordKind);
+            Variable scratch = getLIRGen().newVariable(qwordKind);
+            return new RangeTableSwitchDummyOp(jump, inputIndex, idxScratch, scratch);
+        }
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeProper(LIRInstruction dummy, LIRInstruction old) {
+        if (dummy instanceof RangeTableSwitchDummyOp && old instanceof RangeTableSwitchOp) {
+            RangeTableSwitchDummyOp d = (RangeTableSwitchDummyOp) dummy;
+            RangeTableSwitchOp o = (RangeTableSwitchOp) old;
+            return new RangeTableSwitchOp(d, o);
+        }
+        return null;
+    }
+
+    @Override
+    public LIRInstruction makeAdaptedCopy(LIRInstruction instruction, Variable inputIndex, Variable result) {
+        if (instruction instanceof AMD64Unary.MemoryOp) {
+            AMD64Unary.MemoryOp i = (AMD64Unary.MemoryOp) instruction;
+            return new AMD64Unary.MemoryOp(i, inputIndex, result);
+        }
+        if (instruction instanceof AMD64Unary.MOp) {
+            AMD64Unary.MOp i = (AMD64Unary.MOp) instruction;
+            return new AMD64Unary.MOp(i, inputIndex, result);
+        }
         return null;
     }
 

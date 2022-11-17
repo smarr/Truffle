@@ -197,7 +197,7 @@ public class StandardOp {
         public static final LIRInstructionClass<JumpOp> TYPE = LIRInstructionClass.create(JumpOp.class);
         public static final EnumSet<OperandFlag> outgoingFlags = EnumSet.of(REG, STACK, CONST, OUTGOING);
 
-        @Alive({REG, STACK, CONST, OUTGOING}) private Value[] outgoingValues;
+        @Alive({REG, STACK, CONST, OUTGOING}) protected Value[] outgoingValues;
 
         private final LabelRef destination;
 
@@ -228,6 +228,16 @@ public class StandardOp {
             this.outgoingValues = values;
         }
 
+        public void addOutgoingValue(Value value) {
+            assert outgoingValues != null;
+
+            Value[] newArray = new Value[outgoingValues.length + 1];
+
+            System.arraycopy(outgoingValues, 0, newArray, 0, outgoingValues.length);
+            newArray[outgoingValues.length] = value;
+            outgoingValues = newArray;
+        }
+
         public int getPhiSize() {
             return outgoingValues.length;
         }
@@ -243,6 +253,39 @@ public class StandardOp {
 
         private boolean checkRange(int idx) {
             return idx < outgoingValues.length;
+        }
+    }
+
+    public static class RangeTableSwitchDummyOp extends JumpOp {
+        public static final LIRInstructionClass<RangeTableSwitchDummyOp> TYPE = LIRInstructionClass.create(RangeTableSwitchDummyOp.class);
+
+        @Use protected Value index;
+        @Temp({REG, HINT}) protected Value idxScratch;
+        @Temp protected Value scratch;
+
+        public RangeTableSwitchDummyOp(JumpOp old, Value index, Variable scratch, Variable idxScratch) {
+            super(TYPE, old.destination);
+            this.index = index;
+            this.scratch = scratch;
+            this.idxScratch = idxScratch;
+            this.outgoingValues = old.outgoingValues;
+        }
+
+        public Value getIndex() {
+            return index;
+        }
+
+        public Value getIndexScratch() {
+            return idxScratch;
+        }
+
+        public Value getScratch() {
+            return scratch;
+        }
+
+        @Override
+        public void emitCode(CompilationResultBuilder crb) {
+            throw new UnsupportedOperationException("should have been replaced before emitting code");
         }
     }
 

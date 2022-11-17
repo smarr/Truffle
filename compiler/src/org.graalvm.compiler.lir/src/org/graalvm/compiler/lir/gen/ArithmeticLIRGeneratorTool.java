@@ -112,6 +112,12 @@ public interface ArithmeticLIRGeneratorTool {
 
     LIRInstruction makeMoveFromStackToReg(LIRInstruction regToStack);
 
+    LIRInstruction makeAdaptedDummy(LIRInstruction instruction, Variable inputIndex, LIRKind dwordKind, LIRKind qwordKind);
+
+    LIRInstruction makeProper(LIRInstruction dummy, LIRInstruction old);
+
+    LIRInstruction makeAdaptedCopy(LIRInstruction instruction, Variable inputIndex, Variable result);
+
     Variable emitLoad(LIRKind kind, Value address, LIRFrameState state, MemoryOrderMode memoryOrder, MemoryExtendKind extendKind);
 
     void emitStore(ValueKind<?> kind, Value address, Value input, LIRFrameState state, MemoryOrderMode memoryOrder);

@@ -47,6 +47,8 @@ public interface AbstractControlFlowGraph<T extends AbstractBlockBase<T>> {
 
     boolean isComputeBytecodeLoop();
 
+    boolean isDeoptTarget();
+
     /**
      * True if block {@code b} is dominated by block {@code a} or {@code a} is equal to {@code b}.
      */
