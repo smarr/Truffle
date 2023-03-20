@@ -123,6 +123,7 @@ import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.LanguageInfo;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RootNode;
+import com.oracle.truffle.api.operation.tracing.OperationsStatistics;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.polyglot.PolyglotContextConfig.FileSystemConfig;
 import com.oracle.truffle.polyglot.PolyglotContextConfig.PreinitConfig;
@@ -219,6 +220,7 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
     private volatile int asynchronousStackDepth = 0;
 
     final SpecializationStatistics specializationStatistics;
+    final OperationsStatistics operationStatistics;
     Function<String, TruffleLogger> engineLoggerSupplier;   // effectively final
     @CompilationFinal private TruffleLogger engineLogger;   // effectively final
 
@@ -342,6 +344,12 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
             this.specializationStatistics = SpecializationStatistics.create();
         } else {
             this.specializationStatistics = null;
+        }
+
+        if (engineOptionValues.hasBeenSet(PolyglotEngineOptions.OperationsTracingState)) {
+            this.operationStatistics = OperationsStatistics.create(engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
+        } else {
+            this.operationStatistics = null;
         }
 
         this.runtimeData = RUNTIME.createRuntimeData(this, engineOptions, engineLoggerSupplier, sandboxPolicy);
@@ -582,6 +590,12 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
             this.specializationStatistics = SpecializationStatistics.create();
         } else {
             this.specializationStatistics = null;
+        }
+
+        if (this.engineOptionValues.hasBeenSet(PolyglotEngineOptions.OperationsTracingState)) {
+            this.operationStatistics = OperationsStatistics.create(this.engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
+        } else {
+            this.operationStatistics = null;
         }
 
         Collection<PolyglotInstrument> instrumentsToCreate = new ArrayList<>();
@@ -1276,6 +1290,19 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
                         } else {
                             context.closeAndMaybeWait(false, null);
                         }
+                    }
+                }
+
+                if (operationStatistics != null) {
+                    boolean dumpStatistics = engineOptionValues.get(PolyglotEngineOptions.OperationsDumpDecisions);
+
+                    StringWriter stringDumpWriter = dumpStatistics ? new StringWriter() : null;
+                    PrintWriter dumpWriter = dumpStatistics ? new PrintWriter(stringDumpWriter) : null;
+
+                    operationStatistics.write(dumpWriter);
+
+                    if (dumpStatistics) {
+                        getEngineLogger().log(Level.INFO, stringDumpWriter.toString());
                     }
                 }
 
