@@ -102,7 +102,7 @@ import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
-import com.oracle.truffle.api.bytecode.tracing.OperationsStatistics;
+import com.oracle.truffle.api.bytecode.tracing.BytecodeStatistics;
 import com.oracle.truffle.api.InstrumentInfo;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.TruffleFile;
@@ -220,7 +220,7 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
     private volatile int asynchronousStackDepth = 0;
 
     final SpecializationStatistics specializationStatistics;
-    final OperationsStatistics operationStatistics;
+    final BytecodeStatistics operationStatistics;
     Function<String, TruffleLogger> engineLoggerSupplier;   // effectively final
     @CompilationFinal private TruffleLogger engineLogger;   // effectively final
 
@@ -347,7 +347,7 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
         }
 
         if (engineOptionValues.hasBeenSet(PolyglotEngineOptions.OperationsTracingState)) {
-            this.operationStatistics = OperationsStatistics.create(engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
+            this.operationStatistics = BytecodeStatistics.create(engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
         } else {
             this.operationStatistics = null;
         }
@@ -593,7 +593,7 @@ final class PolyglotEngineImpl implements com.oracle.truffle.polyglot.PolyglotIm
         }
 
         if (this.engineOptionValues.hasBeenSet(PolyglotEngineOptions.OperationsTracingState)) {
-            this.operationStatistics = OperationsStatistics.create(this.engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
+            this.operationStatistics = BytecodeStatistics.create(this.engineOptionValues.get(PolyglotEngineOptions.OperationsTracingState));
         } else {
             this.operationStatistics = null;
         }
