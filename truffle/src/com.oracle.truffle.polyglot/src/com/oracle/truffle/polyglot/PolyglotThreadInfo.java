@@ -270,8 +270,8 @@ final class PolyglotThreadInfo {
             enterStatistics(engine.specializationStatistics);
         }
 
-        if (engine.operationStatistics != null) {
-            operationsStatisticsEntry = new OperationsStatisticsEntry(engine.operationStatistics.enter(), operationsStatisticsEntry);
+        if (engine.bytecodeStatistics != null) {
+            operationsStatisticsEntry = new OperationsStatisticsEntry(engine.bytecodeStatistics.enter(), operationsStatisticsEntry);
         }
     }
 
@@ -300,8 +300,8 @@ final class PolyglotThreadInfo {
             if (engine.specializationStatistics != null) {
                 leaveStatistics(engine.specializationStatistics);
             }
-            if (engine.operationStatistics != null) {
-                engine.operationStatistics.exit(operationsStatisticsEntry.statistics);
+            if (engine.bytecodeStatistics != null) {
+                engine.bytecodeStatistics.exit(operationsStatisticsEntry.statistics);
                 operationsStatisticsEntry = operationsStatisticsEntry.next;
             }
         }
