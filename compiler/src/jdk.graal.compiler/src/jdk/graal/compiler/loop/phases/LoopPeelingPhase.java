@@ -27,9 +27,13 @@ package jdk.graal.compiler.loop.phases;
 import java.util.Optional;
 
 import jdk.graal.compiler.debug.DebugContext;
+import jdk.graal.compiler.graph.Node;
+import jdk.graal.compiler.graph.iterators.NodeIterable;
+import jdk.graal.compiler.nodes.AbstractBeginNode;
 import jdk.graal.compiler.nodes.GraphState;
 import jdk.graal.compiler.nodes.GraphState.StageFlag;
 import jdk.graal.compiler.nodes.StructuredGraph;
+import jdk.graal.compiler.nodes.extended.IntegerSwitchNode;
 import jdk.graal.compiler.nodes.loop.LoopEx;
 import jdk.graal.compiler.nodes.loop.LoopPolicies;
 import jdk.graal.compiler.nodes.loop.LoopsData;
@@ -82,6 +86,7 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
             // for me to reason about it
             return;
         }
+
         DebugContext debug = graph.getDebug();
         if (graph.hasLoops()) {
             LoopsData data = context.getLoopsDataProvider().getLoopsData(graph);
@@ -93,6 +98,25 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
                         for (int iteration = 0; iteration < Options.IterativePeelingLimit.getValue(graph.getOptions()); iteration++) {
                             if ((shouldPeelAlot || getPolicies().shouldPeel(loop, data.getCFG(), context, iteration)) &&
                                             (shouldPeelOnly == -1 || shouldPeelOnly == loop.loopBegin().getId())) {
+                                // try to detect my bytecode loop
+                                if (!loop.isCounted() && graph.isMyBytecodeLoop) {
+                                    assert loop.getInductionVariables().size() == 0 : "I assume that if the loop is not counted, it shouldn't have induction variables either.";
+
+                                    AbstractBeginNode begin = loop.loop().getHeader().getBeginNode();
+                                    NodeIterable<Node> sucs = begin.next().successors();
+                                    if (sucs.isNotEmpty()) {
+                                        Node second = sucs.iterator().next();
+                                        if (second instanceof IntegerSwitchNode isn) {
+                                            if (isn.keyCount() >= 50) {
+                                                // now have something that might be a bytecode loop
+                                                System.out.println("Skipping the peeling of a loop in " + graph);
+                                                continue;
+                                            }
+                                        }
+                                    }
+
+                                }
+
                                 LoopTransformations.peel(loop);
                                 loop.invalidateFragmentsAndIVs();
                                 data.getCFG().updateCachedLocalLoopFrequency(loop.loopBegin(), f -> f.decrementFrequency(1.0));
