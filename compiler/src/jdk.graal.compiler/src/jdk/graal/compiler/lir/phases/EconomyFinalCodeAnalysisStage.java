@@ -25,12 +25,14 @@
 package jdk.graal.compiler.lir.phases;
 
 import jdk.graal.compiler.lir.dfa.LocationMarkerPhase;
+import jdk.graal.compiler.lir.dfa.PushMovesToUsagePhase;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase.FinalCodeAnalysisContext;
 
 public class EconomyFinalCodeAnalysisStage extends LIRPhaseSuite<FinalCodeAnalysisContext> {
 
     @SuppressWarnings("this-escape")
     public EconomyFinalCodeAnalysisStage() {
+        appendPhase(new PushMovesToUsagePhase());
         appendPhase(new LocationMarkerPhase());
     }
 }

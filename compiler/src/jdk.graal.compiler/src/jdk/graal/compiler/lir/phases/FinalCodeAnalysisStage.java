@@ -25,6 +25,7 @@
 package jdk.graal.compiler.lir.phases;
 
 import jdk.graal.compiler.lir.dfa.LocationMarkerPhase;
+import jdk.graal.compiler.lir.dfa.PushMovesToUsagePhase;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase.FinalCodeAnalysisContext;
 import jdk.graal.compiler.options.OptionValues;
 
@@ -32,6 +33,7 @@ public class FinalCodeAnalysisStage extends LIRPhaseSuite<FinalCodeAnalysisConte
 
     @SuppressWarnings("this-escape")
     public FinalCodeAnalysisStage(@SuppressWarnings("unused") OptionValues options) {
+        appendPhase(new PushMovesToUsagePhase());
         appendPhase(new LocationMarkerPhase());
     }
 }
