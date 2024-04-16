@@ -99,16 +99,19 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
                             if ((shouldPeelAlot || getPolicies().shouldPeel(loop, data.getCFG(), context, iteration)) &&
                                             (shouldPeelOnly == -1 || shouldPeelOnly == loop.loopBegin().getId())) {
                                 // try to detect my bytecode loop
-                                if (!loop.isCounted() && graph.isMyBytecodeLoop) {
-                                    assert loop.getInductionVariables().size() == 0 : "I assume that if the loop is not counted, it shouldn't have induction variables either.";
+                                //if (!loop.isCounted() && graph.isMyBytecodeLoop) {
+                                //    assert loop.getInductionVariables().size() == 0 : "I assume that if the loop is not counted, it shouldn't have induction variables either.";
+                                if (graph.isMyBytecodeLoop && loop.getInductionVariables().size() == 0) {
 
                                     AbstractBeginNode begin = loop.loop().getHeader().getBeginNode();
                                     NodeIterable<Node> sucs = begin.next().successors();
                                     if (sucs.isNotEmpty()) {
                                         Node second = sucs.iterator().next();
                                         if (second instanceof IntegerSwitchNode isn) {
-                                            if (isn.keyCount() >= 50) {
+                                            if (isn.keyCount() >= 20) {
                                                 // now have something that might be a bytecode loop
+                                                isn.markAsBytecodeSwitch();
+
                                                 System.out.println("Skipping the peeling of a loop in " + graph);
                                                 continue;
                                             }

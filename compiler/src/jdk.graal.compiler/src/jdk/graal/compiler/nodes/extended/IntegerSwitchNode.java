@@ -89,6 +89,8 @@ public final class IntegerSwitchNode extends SwitchNode implements LIRLowerable,
      */
     protected final boolean areKeysContiguous;
 
+    protected boolean isBytecodeSwitch;
+
     public IntegerSwitchNode(ValueNode value, AbstractBeginNode[] successors, int[] keys, int[] keySuccessors, SwitchProbabilityData profileData) {
         super(TYPE, value, successors, keySuccessors, profileData);
         assert keySuccessors.length == keys.length + 1 : "Must have etry key for default " + Assertions.errorMessageContext("keySucc", keySuccessors, "keys", keys);
@@ -98,6 +100,8 @@ public final class IntegerSwitchNode extends SwitchNode implements LIRLowerable,
         assert value.stamp(NodeView.DEFAULT) instanceof PrimitiveStamp && value.stamp(NodeView.DEFAULT).getStackKind().isNumericInteger() : Assertions.errorMessageContext("value", value);
         assert assertSorted();
         assert assertNoUntargettedSuccessor();
+
+        isBytecodeSwitch = false;
     }
 
     private boolean assertSorted() {
@@ -121,6 +125,19 @@ public final class IntegerSwitchNode extends SwitchNode implements LIRLowerable,
 
     public IntegerSwitchNode(ValueNode value, int successorCount, int[] keys, int[] keySuccessors, SwitchProbabilityData profileData) {
         this(value, new AbstractBeginNode[successorCount], keys, keySuccessors, profileData);
+    }
+
+    public void markAsBytecodeSwitch() {
+        isBytecodeSwitch = true;
+
+        assert areKeysContiguous;
+        for (int bytecode = 0; bytecode < keys.length; bytecode += 1) {
+            successorAtKey(bytecode).markAsBytecodeHandler(bytecode);
+        }
+    }
+
+    public boolean isBytecodeSwitch() {
+        return isBytecodeSwitch;
     }
 
     @Override
