@@ -638,6 +638,8 @@ public interface LIRGeneratorTool extends CoreProviders, DiagnosticLIRGeneratorT
      */
     void emitSpeculationFence();
 
+    default void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex) {}
+
     /**
      * Write value to the protection key register.
      *

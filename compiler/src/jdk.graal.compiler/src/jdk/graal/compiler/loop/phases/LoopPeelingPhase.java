@@ -112,6 +112,9 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
                                                 // now have something that might be a bytecode loop
                                                 isn.markAsBytecodeSwitch();
 
+                                                // TODO: need to mark the start nodes of each successor, I believe
+                                                //       mark them as bytecode handler, with the bytecode number
+
                                                 System.out.println("Skipping the peeling of a loop in " + graph);
                                                 continue;
                                             }
