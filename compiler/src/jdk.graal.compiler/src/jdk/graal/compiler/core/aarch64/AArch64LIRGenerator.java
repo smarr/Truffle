@@ -29,6 +29,7 @@ import static jdk.graal.compiler.lir.LIRValueUtil.asVariable;
 import static jdk.graal.compiler.lir.LIRValueUtil.isIntConstant;
 import static jdk.vm.ci.aarch64.AArch64.sp;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.function.Function;
 
@@ -42,6 +43,7 @@ import jdk.graal.compiler.core.common.memory.MemoryOrderMode;
 import jdk.graal.compiler.core.common.spi.LIRKindTool;
 import jdk.graal.compiler.debug.Assertions;
 import jdk.graal.compiler.debug.GraalError;
+import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRFrameState;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRValueUtil;
@@ -905,6 +907,15 @@ public abstract class AArch64LIRGenerator extends LIRGenerator {
     @Override
     public void emitSpeculationFence() {
         append(new AArch64SpeculativeBarrier());
+    }
+
+    @Override
+    public void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex) {
+        LIR lir = getResult().getLIR();
+        ArrayList<LIRInstruction> lirForBlock = lir.getLIRforBlock(getCurrentBlock());
+        assert lirForBlock.get(0) instanceof StandardOp.LabelOp : "Expected label at start of block";
+        StandardOp.LabelOp label = (StandardOp.LabelOp) lirForBlock.get(0);
+        label.setBytecodeHandlerIndex(bytecodeHandlerIndex);
     }
 
     @Override

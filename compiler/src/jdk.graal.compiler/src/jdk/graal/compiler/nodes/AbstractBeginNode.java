@@ -105,6 +105,10 @@ public abstract class AbstractBeginNode extends FixedWithNextNode implements LIR
 
     @Override
     public void generate(NodeLIRBuilderTool gen) {
+        if (bytecodeHandlerIndex != -1) {
+            gen.getLIRGeneratorTool().markBlockAsBytecodeHandlerStart(bytecodeHandlerIndex);
+        }
+
         if (hasSpeculationFence) {
             gen.getLIRGeneratorTool().emitSpeculationFence();
         }
