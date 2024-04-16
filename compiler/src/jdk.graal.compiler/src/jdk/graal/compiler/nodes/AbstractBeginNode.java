@@ -48,12 +48,24 @@ public abstract class AbstractBeginNode extends FixedWithNextNode implements LIR
 
     private boolean hasSpeculationFence;
 
+    private int bytecodeHandlerIndex;
+
     protected AbstractBeginNode(NodeClass<? extends AbstractBeginNode> c) {
         this(c, StampFactory.forVoid());
     }
 
     protected AbstractBeginNode(NodeClass<? extends AbstractBeginNode> c, Stamp stamp) {
         super(c, stamp);
+        bytecodeHandlerIndex = -1;
+    }
+
+    public int getBytecodeHandlerIndex() {
+        return bytecodeHandlerIndex;
+    }
+
+    public void markAsBytecodeHandler(int handlerIndex) {
+        assert handlerIndex >= 0;
+        bytecodeHandlerIndex = handlerIndex;
     }
 
     public static AbstractBeginNode prevBegin(FixedNode from) {
