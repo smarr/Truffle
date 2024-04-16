@@ -96,6 +96,14 @@ public class AArch64ControlFlow {
             this.trueDestinationProbability = trueDestinationProbability;
         }
 
+        public LabelRef getTrueDestination() {
+            return trueDestination;
+        }
+
+        public LabelRef getFalseDestination() {
+            return falseDestination;
+        }
+
         protected abstract void emitBranch(CompilationResultBuilder crb, AArch64MacroAssembler masm, LabelRef target, boolean negate);
 
         @Override

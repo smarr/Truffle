@@ -88,12 +88,24 @@ public class StandardOp {
         private int alignment;
         private int numbPhis;
 
+        private int bytecodeHandlerIndex;
+
         public LabelOp(Label label, int alignment) {
             super(TYPE);
             this.label = label;
             this.alignment = alignment;
             this.incomingValues = Value.NO_VALUES;
             this.numbPhis = 0;
+
+            this.bytecodeHandlerIndex = -1;
+        }
+
+        public void setBytecodeHandlerIndex(int index) {
+            this.bytecodeHandlerIndex = index;
+        }
+
+        public int getBytecodeHandlerIndex() {
+            return bytecodeHandlerIndex;
         }
 
         public void setPhiValues(Value[] values) {
