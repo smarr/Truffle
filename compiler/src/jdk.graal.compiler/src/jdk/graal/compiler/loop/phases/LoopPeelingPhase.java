@@ -80,13 +80,6 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
     @Override
     @SuppressWarnings({"try", "deprecation"})
     protected void run(StructuredGraph graph, CoreProviders context) {
-        if (graph.isComputeBytecode) {
-            // Disable Loop Peeling for my tiny bytecode loop
-            // This is to keep the native code as simple as possible
-            // for me to reason about it
-            return;
-        }
-
         DebugContext debug = graph.getDebug();
         if (graph.hasLoops()) {
             LoopsData data = context.getLoopsDataProvider().getLoopsData(graph);

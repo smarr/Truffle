@@ -756,7 +756,7 @@ public abstract class NodeLIRBuilder implements NodeLIRBuilderTool, LIRGeneratio
                     keyProbabilities[i] = intSwitch.keyProbability(i);
                     assert keyConstants[i].getJavaKind() == keyKind : Assertions.errorMessage(keyConstants, keyKind);
                 }
-                gen.emitStrategySwitch(keyConstants, keyProbabilities, keyTargets, defaultTarget, value, x.graph().isComputeBytecode);
+                gen.emitStrategySwitch(keyConstants, keyProbabilities, keyTargets, defaultTarget, value, x.graph().isMyBytecodeLoop);
             } else {
                 // keyKind != JavaKind.Int || !x.isSorted()
                 LabelRef[] keyTargets = new LabelRef[keyCount];
