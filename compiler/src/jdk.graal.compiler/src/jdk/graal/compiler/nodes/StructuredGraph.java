@@ -387,10 +387,16 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
             return false;
         }
         String className = method.getDeclaringClass().getName();
+
         if (method.getDeclaringClass().getName().indexOf("/") == -1) {
             // for classes not in packages, like the AWFY benchmarks.
             return true;
         }
+
+        if (className.contains("AArch64PushMovesTest") && method.getName().equals("smallBytecodeLoop")) {
+            return true;
+        }
+
         return className.startsWith("Ltrufflesom") ||
                         className.startsWith("Lbdt/") ||
                         className.startsWith("Ltools/") ||

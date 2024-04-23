@@ -68,9 +68,15 @@ public class AArch64PushMovesTest extends LIRTest {
     protected void checkLIR(String methodName, Predicate<LIRInstruction> predicate, int expected) {
         compile(getResolvedJavaMethod(methodName), null);
         int actualOpNum = 0;
-        for (LIRInstruction ins : lir.getLIRforBlock(lir.getControlFlowGraph().getBlocks()[lir.codeEmittingOrder()[0]])) {
-            if (predicate.test(ins)) {
-                actualOpNum++;
+        int[] codeEmitOrder = lir.codeEmittingOrder();
+        for (int blockId : codeEmitOrder) {
+            if (LIR.isBlockDeleted(blockId)) {
+                continue;
+            }
+            for (LIRInstruction ins : lir.getLIRforBlock(lir.getBlockById(blockId))) {
+                if (predicate.test(ins)) {
+                    actualOpNum++;
+                }
             }
         }
         Assert.assertEquals(expected, actualOpNum);
@@ -95,8 +101,6 @@ public class AArch64PushMovesTest extends LIRTest {
             this.const3 = const3;
             this.bytecodes = bytecodes;
         }
-
-
     }
 
     private static class State {
@@ -200,7 +204,7 @@ public class AArch64PushMovesTest extends LIRTest {
                 return label.getBytecodeHandlerIndex() != -1;
             }
             return false;
-            // we'd expect 0 of them to be marked for the trivial snippet
-        }, 0);
+            // we'd expect 7 bytecode handlers for the smallBytecodeLoop
+        }, 7);
     }
 }
