@@ -411,8 +411,6 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
     private OptimizationLog optimizationLog;
 
     public final boolean isMyBytecodeLoop;
-    public final boolean isComputeBytecode;
-// public final boolean isBytecodeLoop;
 
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
@@ -447,15 +445,6 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.cacheInvalidationListener = new CacheInvalidationListener();
 
         isMyBytecodeLoop = isMyBytecodeLoop(method);
-        isComputeBytecode = isComputeBytecode(method);
-    }
-
-    private static boolean isComputeBytecode(ResolvedJavaMethod method) {
-        if (method == null) {
-            return false;
-        }
-        String className = method.getDeclaringClass().getName();
-        return className.contains("ComputeBytecode") && method.getName().startsWith("executeGeneric");
     }
 
     private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
