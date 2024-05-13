@@ -66,6 +66,7 @@ public class AArch64PushMovesTest extends LIRTest {
         compile(getResolvedJavaMethod(methodName), null);
         int actualOpNum = 0;
         int[] codeEmitOrder = lir.codeEmittingOrder();
+
         for (int blockId : codeEmitOrder) {
             if (LIR.isBlockDeleted(blockId)) {
                 continue;
@@ -108,6 +109,16 @@ public class AArch64PushMovesTest extends LIRTest {
         long field;
     }
 
+    @HostCompilerDirectives.InliningCutoff
+    private static void noop(byte[] bytecodes, int i) {
+        System.out.println(bytecodes[i]);
+        byte old = bytecodes[i];
+        bytecodes[i] = 0;
+        System.out.println(bytecodes[i]);
+        bytecodes[i] = old;
+    }
+
+
     @ExplodeLoop(kind = LoopExplosionKind.MERGE_EXPLODE)
     @BytecodeInterpreterSwitch
     public Object smallBytecodeLoop(final MethodActivation frame) {
@@ -125,16 +136,19 @@ public class AArch64PushMovesTest extends LIRTest {
         // 6: return top
 
         final byte[] bytecodes = frame.bytecodes;
+        final Object[] quickenedNodes = new Object[bytecodes.length];
 
         boolean isIntegerField = false;
 
         int i = 0;
+        int stackPointer = 0;
+        long[] stack = new long[10];
 
         for (;;) {
             byte b = bytecodes[i];
 
             switch (b) {
-                case 0:
+                case 0: {
                     if (frame.fieldType == 10) {
                         isIntegerField = true;
                     } else {
@@ -143,7 +157,8 @@ public class AArch64PushMovesTest extends LIRTest {
                     }
                     i += 1;
                     break;
-                case 1:
+                }
+                case 1: {
                     try {
                         if (isIntegerField) {
                             if (frame.fieldType != 10) {
@@ -159,7 +174,8 @@ public class AArch64PushMovesTest extends LIRTest {
                     }
                     i += 1;
                     break;
-                case 2:
+                }
+                case 2: {
                     try {
                         state.top = Math.multiplyExact(state.top, frame.const1);
                     } catch (ArithmeticException e) {
@@ -168,7 +184,8 @@ public class AArch64PushMovesTest extends LIRTest {
                     }
                     i += 1;
                     break;
-                case 3:
+                }
+                case 3: {
                     try {
                         state.top = Math.addExact(state.top, frame.const2);
                     } catch (ArithmeticException e) {
@@ -177,23 +194,105 @@ public class AArch64PushMovesTest extends LIRTest {
                     }
                     i += 1;
                     break;
-                case 4:
+                }
+                case 4: {
                     state.top = state.top & frame.const3;
                     i += 1;
                     break;
-                case 5:
+                }
+                case 5: {
                     ((LangObject) rcvr).field = state.top;
                     i += 1;
                     break;
-                case 6:
+                }
+                case 6: {
+                    // return state.top;
+                    i += 1;
+                    break;
+                }
+                case 7: {
+                    if (frame.fieldType == 10) {
+                        isIntegerField = true;
+                    } else {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        throw new UnsupportedOperationException();
+                    }
+                    i += bytecodes[i + 1];
+                    stack[stackPointer] = state.top;
+                    stackPointer += 1;
+                    break;
+                }
+                case 8: {
+                    try {
+                        if (isIntegerField) {
+                            if (frame.fieldType != 10) {
+                                throw new UnexpectedResultException(rcvr);
+                            }
+                            state.top = ((LangObject) rcvr).field;
+                        } else {
+                            throw new UnexpectedResultException(rcvr);
+                        }
+                    } catch (UnexpectedResultException e) {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        throw new UnsupportedOperationException();
+                    }
+                    i += 1;
+                    stackPointer += 1;
+                    state.top = stack[stackPointer - 1];
+                    break;
+                }
+                case 9: {
+                    try {
+                        state.top = Math.multiplyExact(state.top, frame.const1);
+                    } catch (ArithmeticException e) {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        throw new UnsupportedOperationException();
+                    }
+                    i += bytecodes[i + 1];
+                    stackPointer -= 1;
+                    state.top = stack[stackPointer];
+                    break;
+                }
+                case 10: {
+                    try {
+                        state.top = Math.addExact(state.top, frame.const2);
+                    } catch (ArithmeticException e) {
+                        CompilerDirectives.transferToInterpreterAndInvalidate();
+                        throw new UnsupportedOperationException();
+                    }
+                    i += 1;
+                    stackPointer -= 1;
+                    stack[stackPointer] = state.top;
+                    break;
+                }
+                case 11: {
+                    state.top = state.top & frame.const3;
+                    i += 1;
+                    quickenedNodes[i] = state;
+                    break;
+                }
+                case 12: {
+                    ((LangObject) rcvr).field = state.top;
+                    i += 1;
+                    quickenedNodes[i] = rcvr;
+                    break;
+                }
+                case 13: {
+                    if (quickenedNodes[i] != null) {
+                        return quickenedNodes[i];
+                    }
                     return state.top;
+                }
             }
         }
     }
 
     @Test
     public void testBytecodeLoopHandlersGetMarked() {
-        MethodActivation frame = new MethodActivation(1309, 13849, 65535, new byte[] {0, 1, 2, 3, 4, 5, 6}, 1);
+        MethodActivation frame = new MethodActivation(1309, 13849, 65535, new byte[] {
+                0, 1, 2, 3, 4, 5, 6,
+                7, 2 /*len*/, 8, 9, 2/*len*/, 10, 11, 12, 13
+        }, 1);
         test("smallBytecodeLoop", frame);
         checkLIR("smallBytecodeLoop", (op) -> {
             // count how many basic blocks were marked as bytecode handlers
@@ -201,7 +300,7 @@ public class AArch64PushMovesTest extends LIRTest {
                 return label.getBytecodeHandlerIndex() != -1;
             }
             return false;
-            // we'd expect 7 bytecode handlers for the smallBytecodeLoop
-        }, 7);
+            // we'd expect number of bytecode handlers for the smallBytecodeLoop
+        }, 14);
     }
 }
