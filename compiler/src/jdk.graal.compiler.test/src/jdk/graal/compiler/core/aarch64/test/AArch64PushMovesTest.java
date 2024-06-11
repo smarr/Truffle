@@ -10,15 +10,18 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.dfa.PushMovesToUsagePhase.BasicBlockBytecodeDetails;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.jtt.LIRTest;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.graal.compiler.lir.phases.LIRSuites;
 import jdk.graal.compiler.options.OptionValues;
 import jdk.vm.ci.code.TargetDescription;
+import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.function.Predicate;
 
 public class AArch64PushMovesTest extends LIRTest {
@@ -304,5 +307,26 @@ public class AArch64PushMovesTest extends LIRTest {
             return false;
             // we'd expect number of bytecode handlers for the smallBytecodeLoop
         }, 14);
+
+        checkCFDetails(36, true, true, false,0);
+        checkCFDetails(38, true, true, false,1);
+        checkCFDetails(46, true, true, false,2);
+        checkCFDetails(49, true, true, false,3);
+        checkCFDetails(52, true, true, false,4);
+        checkCFDetails(53, true, true, false,5);
+        checkCFDetails(59, true, true, false,6);
+    }
+
+    protected void checkCFDetails(int blockId, boolean canHead, boolean canSlow, boolean canReturn, int bhi) {
+        int[] codeEmitOrder = lir.codeEmittingOrder();
+
+        ArrayList<LIRInstruction> insts = lir.getLIRforBlock(lir.getBlockById(blockId));
+        Assert.assertThat(insts.getFirst(), CoreMatchers.instanceOf(StandardOp.LabelOp.class));
+        StandardOp.LabelOp label = (StandardOp.LabelOp) insts.getFirst();
+        Assert.assertEquals(bhi, label.getBytecodeHandlerIndex());
+        BasicBlockBytecodeDetails details = (BasicBlockBytecodeDetails) label.hackPushMovesToUsagePhaseData;
+        Assert.assertEquals(canHead, details.canLeadToHeadOfLoop);
+        Assert.assertEquals(canSlow, details.canLeadToSlowPath);
+        Assert.assertEquals(canReturn, details.canLeadToReturn);
     }
 }
