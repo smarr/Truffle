@@ -61,6 +61,7 @@ import jdk.graal.compiler.lir.LIRFrameState;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.LabelRef;
+import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.StandardOp.NoOp;
 import jdk.graal.compiler.lir.SwitchStrategy;
 import jdk.graal.compiler.lir.Variable;
@@ -630,5 +631,14 @@ public class AMD64HotSpotLIRGenerator extends AMD64LIRGenerator implements HotSp
     @Override
     public Register getHeapBaseRegister() {
         return getProviders().getRegisters().getHeapBaseRegister();
+    }
+
+    @Override
+    public void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex) {
+        LIR lir = getResult().getLIR();
+        ArrayList<LIRInstruction> lirForBlock = lir.getLIRforBlock(getCurrentBlock());
+        assert lirForBlock.get(0) instanceof StandardOp.LabelOp : "Expected label at start of block";
+        StandardOp.LabelOp label = (StandardOp.LabelOp) lirForBlock.get(0);
+        label.setBytecodeHandlerIndex(bytecodeHandlerIndex);
     }
 }
