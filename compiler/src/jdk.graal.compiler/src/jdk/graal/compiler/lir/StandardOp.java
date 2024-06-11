@@ -90,6 +90,8 @@ public class StandardOp {
 
         private int bytecodeHandlerIndex;
 
+        public Object hackPushMovesToUsagePhaseData;
+
         public LabelOp(Label label, int alignment) {
             super(TYPE);
             this.label = label;
