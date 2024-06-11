@@ -2,6 +2,7 @@ package jdk.graal.compiler.core.aarch64.test;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
+import com.oracle.truffle.api.HostCompilerDirectives.InliningCutoff;
 import com.oracle.truffle.api.HostCompilerDirectives.BytecodeInterpreterSwitch;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.ExplodeLoop.LoopExplosionKind;
@@ -26,6 +27,7 @@ public class AArch64PushMovesTest extends LIRTest {
     /**
      * Test snippet that should not trigger the PushMovesToUsagePhase phase
      */
+    @SuppressWarnings("unused")
     public static int trivialTestSnippetWithoutBytecodeLoop(int a, int b) {
         if (a > 0) {
             return a + b;
@@ -109,7 +111,7 @@ public class AArch64PushMovesTest extends LIRTest {
         long field;
     }
 
-    @HostCompilerDirectives.InliningCutoff
+    @InliningCutoff
     private static void noop(byte[] bytecodes, int i) {
         System.out.println(bytecodes[i]);
         byte old = bytecodes[i];
