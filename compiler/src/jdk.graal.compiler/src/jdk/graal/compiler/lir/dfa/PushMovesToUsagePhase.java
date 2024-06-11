@@ -85,7 +85,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
                 var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget));
 
-                BasicBlock<?> falseTarget = b.getTrueDestination().getTargetBlock();
+                BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
                 var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget));
 
                 var details = new BasicBlockBytecodeDetails();
