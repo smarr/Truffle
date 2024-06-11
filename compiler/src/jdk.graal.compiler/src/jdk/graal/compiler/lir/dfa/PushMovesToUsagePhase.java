@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
-    private static class BasicBlockBytecodeDetails {
+    public static class BasicBlockBytecodeDetails {
         public boolean fullyProcessed;
 
         /** This block leads unconditional to the head of the bytecode loop, i.e., it's a back edge. */
@@ -27,6 +27,16 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         /** This block leads unconditional to a return. */
         public boolean leadsToReturn;
+
+        /** This block is on a possible path to the head of the bytecode loop. */
+        public boolean canLeadToHeadOfLoop;
+
+        /** This block is on a possible path to the slow path. */
+        public boolean canLeadToSlowPath;
+
+        /** This block is on a possible path to a return. */
+        public boolean canLeadToReturn;
+
     }
 
     private static class PhaseState {
@@ -59,6 +69,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             var details = new BasicBlockBytecodeDetails();
             details.fullyProcessed = true;
             details.leadsToHeadOfLoop = true;
+            details.canLeadToHeadOfLoop = true;
             return details;
         }
 
@@ -83,6 +94,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 details.leadsToHeadOfLoop = tDetails.leadsToHeadOfLoop && fDetails.leadsToHeadOfLoop;
                 details.leadsToSlowPath = tDetails.leadsToSlowPath && fDetails.leadsToSlowPath;
                 details.leadsToReturn = tDetails.leadsToReturn && fDetails.leadsToReturn;
+                details.canLeadToHeadOfLoop = tDetails.canLeadToHeadOfLoop || fDetails.canLeadToHeadOfLoop;
+                details.canLeadToSlowPath = tDetails.canLeadToSlowPath || fDetails.canLeadToSlowPath;
+                details.canLeadToReturn = tDetails.canLeadToReturn || fDetails.canLeadToReturn;
 
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
@@ -103,6 +117,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails();
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
+                details.canLeadToReturn = true;
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
@@ -116,6 +131,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails();
         details.fullyProcessed = true;
         details.leadsToSlowPath = true;
+        details.canLeadToSlowPath = true;
         label.hackPushMovesToUsagePhaseData = details;
         return details;
     }
