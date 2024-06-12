@@ -224,6 +224,17 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
+    private static void recordAllInputsAndOutputs(BasicBlockBytecodeDetails details, LIRInstruction ins) {
+        ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+            recordInput(details, value);
+            return value;
+        });
+        ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+            recordResult(details, value);
+            return value;
+        });
+    }
+
     private static void establishInputs(PhaseState state, LIR lir) {
         List<LIRInstruction> currentIs = state.dispatchBlock;
         var details = getDetails(currentIs);
@@ -271,34 +282,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         }
                     }
                     case AArch64ArithmeticOp.BinaryConstOp bin -> {
-                        bin.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordInput(details, value);
-                            return value;
-                        });
-                        bin.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordResult(details, value);
-                            return value;
-                        });
+                        recordAllInputsAndOutputs(details, bin);
                     }
                     case AArch64ArithmeticOp.BinaryOp bin -> {
-                        bin.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordInput(details, value);
-                            return value;
-                        });
-                        bin.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordResult(details, value);
-                            return value;
-                        });
+                        recordAllInputsAndOutputs(details, bin);
                     }
                     case AArch64Move.LoadOp load -> {
-                        load.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordInput(details, value);
-                            return value;
-                        });
-                        load.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordResult(details, value);
-                            return value;
-                        });
+                        recordAllInputsAndOutputs(details, load);
                     }
                     case AArch64ControlFlow.RangeTableSwitchOp r -> {
                         // we reached the end of the dispatch blocks
