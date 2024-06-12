@@ -54,6 +54,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static class PhaseState {
         public int dispatchBlockId = -1;
         public List<LIRInstruction> dispatchBlock;
+
+        public int lastDispatchBlockId = -1;
+        public List<LIRInstruction> lastDispatchBlock;
+
         public final List<ArrayList<LIRInstruction>> bytecodeHandlers = new ArrayList<>();
     }
 
@@ -76,12 +80,24 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
 
-    private static BasicBlockBytecodeDetails establishControlFlowProperties(PhaseState state, LIR lir, BasicBlock<?> block, ArrayList<LIRInstruction> instructions) {
+    private static BasicBlockBytecodeDetails establishControlFlowProperties(
+            PhaseState state, LIR lir, BasicBlock<?> block, ArrayList<LIRInstruction> instructions, int prevBlockId) {
         if (instructions == state.dispatchBlock) {
             var details = new BasicBlockBytecodeDetails();
             details.fullyProcessed = true;
             details.leadsToHeadOfLoop = true;
             details.canLeadToHeadOfLoop = true;
+
+            if (prevBlockId < state.dispatchBlockId && prevBlockId != -1) {
+                // We found a block that is before the dispatch block,
+                // and we will have reached `block` from a bytecode handler,
+                // so, we can assume that `block` is part of the bytecode dispatch.
+                // This means, we can replace state.dispatchBlock with `block` to get more precision.
+                BasicBlock<?> prev = lir.getBlockById(prevBlockId);
+                state.dispatchBlockId = prevBlockId;
+                state.dispatchBlock = lir.getLIRforBlock(prev);
+            }
+
             return details;
         }
 
@@ -95,10 +111,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case AArch64ControlFlow.AbstractBranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
 
-                var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget));
+                var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget), block.getId());
 
                 BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
-                var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget));
+                var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget), block.getId());
 
                 var details = new BasicBlockBytecodeDetails();
 
@@ -115,7 +131,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
-                BasicBlockBytecodeDetails details = establishControlFlowProperties(state, lir, target, lir.getLIRforBlock(target));
+                BasicBlockBytecodeDetails details = establishControlFlowProperties(state, lir, target, lir.getLIRforBlock(target), block.getId());
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
@@ -173,6 +189,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 assert state.dispatchBlockId == -1 : "Only one dispatch block expected. But found a second one in blockId: " + blockId;
                 state.dispatchBlockId = blockId;
                 state.dispatchBlock = instructions;
+                state.lastDispatchBlockId = blockId;
+                state.lastDispatchBlock = instructions;
                 continue;
             }
 
@@ -191,7 +209,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             state.bytecodeHandlers.add(instructions);
 
             // 2. establish control flow properties
-            establishControlFlowProperties(state, lir, block, instructions);
+            establishControlFlowProperties(state, lir, block, instructions, -1);
 
             // now we have the start of a bytecode handler
             // the next step would be to try to push down a move instruction
