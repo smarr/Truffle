@@ -2,8 +2,11 @@ package jdk.graal.compiler.lir.dfa;
 
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotDeoptimizeOp;
+import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotMove;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotReturnOp;
+import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotSafepointOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotUnwindOp;
+import jdk.graal.compiler.lir.ConstantValue;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRInstruction.OperandFlag;
@@ -196,6 +199,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return (BasicBlockBytecodeDetails) ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData;
     }
 
+    private static void recordInput(BasicBlockBytecodeDetails details, Register inputReg) {
+        if (!details.writtenToRegisters.contains(inputReg)) {
+            details.readFromRegisters.add(inputReg);
+        }
+    }
+
     private static void recordInput(BasicBlockBytecodeDetails details, Value input) {
         if (isRegister(input)) {
             Register inputReg = asRegister(input);
@@ -207,7 +216,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             if (!details.writtenToMemory.contains(inputSlot)) {
                 details.readFromMemory.add(inputSlot);
             }
-        } else if (isIllegal(input)) {
+        } else if (isIllegal(input) || input instanceof ConstantValue) {
             // ignore
         } else {
             throw new AssertionError("Not yet handled input: " + input);
@@ -235,15 +244,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         });
     }
 
-    private static void establishInputs(PhaseState state, LIR lir) {
-        List<LIRInstruction> currentIs = state.dispatchBlock;
+    private static void establishInputs(PhaseState state, LIR lir, List<LIRInstruction> startIns) {
+        List<LIRInstruction> currentIs = startIns;
         var details = getDetails(currentIs);
         details.initUsageSets();
 
-        // go over the instructions until we reached state.lastDispatchBlock, and process all instructions
-        // to collect the inputs
-
-
+        // go over the instructions until we reached state.lastDispatchBlock,
+        // or the first dispatch block (in the case we processed a bytecode handler)
+        // and process all instructions to collect the inputs
         while (currentIs != null) {
             for (LIRInstruction ins : currentIs) {
                 switch (ins) {
@@ -266,7 +274,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
                         if (trueInstructions == state.lastDispatchBlock) {
                             currentIs = trueInstructions;
-                        } else if (((BasicBlockBytecodeDetails) ((LabelOp) trueInstructions.getFirst()).hackPushMovesToUsagePhaseData).canLeadToHeadOfLoop) {
+                        } else if (getDetails(trueInstructions).canLeadToHeadOfLoop) {
                             currentIs = trueInstructions;
                         } else {
                             BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
@@ -274,12 +282,25 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
                             if (falseInstructions == state.lastDispatchBlock) {
                                 currentIs = falseInstructions;
-                            } else if (((BasicBlockBytecodeDetails) ((LabelOp) falseInstructions.getFirst()).hackPushMovesToUsagePhaseData).canLeadToHeadOfLoop) {
+                            } else if (getDetails(falseInstructions).canLeadToHeadOfLoop) {
                                 currentIs = falseInstructions;
                             } else {
-                                throw new AssertionError("We don't know which branch to take..." + b);
+                                // none of the options lead back to the head of loop it seems
+                                // ok, fine, let's see whether we can get to a return
+                                if (getDetails(trueInstructions).leadsToReturn || getDetails(falseInstructions).leadsToReturn) {
+                                    // good, we're returning, for the moment, we do not care about the performance of this path
+                                    // and just stop here
+                                    currentIs = null;
+                                } else {
+                                   throw new AssertionError("We don't know which branch to take..." + b);
+                                }
                             }
                         }
+                    }
+                    case StandardOp.JumpOp jump -> {
+                        BasicBlock<?> target = jump.destination().getTargetBlock();
+                        var targetInstructions = lir.getLIRforBlock(target);
+                        currentIs = targetInstructions;
                     }
                     case AArch64ArithmeticOp.BinaryConstOp bin -> {
                         recordAllInputsAndOutputs(details, bin);
@@ -287,13 +308,22 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     case AArch64ArithmeticOp.BinaryOp bin -> {
                         recordAllInputsAndOutputs(details, bin);
                     }
-                    case AArch64Move.LoadOp load -> {
-                        recordAllInputsAndOutputs(details, load);
+                    case AArch64Move.LoadOp load -> recordAllInputsAndOutputs(details, load);
+                    case AArch64Move.LoadAddressOp load -> recordAllInputsAndOutputs(details, load);
+                    case AArch64Move.LoadInlineConstant load -> {
+                        recordResult(details, load.getResult());
                     }
+                    case AArch64Move.StoreOp store -> recordAllInputsAndOutputs(details, store);
+                    case AArch64Move.NullCheckOp n -> recordAllInputsAndOutputs(details, n);
                     case AArch64ControlFlow.RangeTableSwitchOp r -> {
                         // we reached the end of the dispatch blocks
                         currentIs = null;
                     }
+                    case AArch64HotSpotSafepointOp s -> {
+                        recordResult(details, s.getScratchValue());
+                        recordInput(details, s.getThreadRegister());
+                    }
+                    case AArch64HotSpotMove.CompressPointer p -> recordAllInputsAndOutputs(details, p);
                     default -> throw new AssertionError("Not yet supported instruction: " + ins);
                 }
             }
@@ -359,7 +389,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             // now we have the start of a bytecode handler
             // the next step would be to try to push down a move instruction
 
-            establishInputs(state, lir);
+            establishInputs(state, lir, state.dispatchBlock);
+
+            for (ArrayList<LIRInstruction> bytecodeHandler : state.bytecodeHandlers) {
+                establishInputs(state, lir, bytecodeHandler);
+            }
+
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
 //                case 1: { // TruffleSOM's DUP bytecode

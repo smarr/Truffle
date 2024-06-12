@@ -65,6 +65,14 @@ public class AArch64HotSpotSafepointOp extends AArch64LIRInstruction {
         this.scratchValue = scratch;
     }
 
+    public AllocatableValue getScratchValue() {
+        return scratchValue;
+    }
+
+    public Register getThreadRegister() {
+        return thread;
+    }
+
     @Override
     public void emitCode(CompilationResultBuilder crb, AArch64MacroAssembler masm) {
         Register scratch = asRegister(scratchValue);
