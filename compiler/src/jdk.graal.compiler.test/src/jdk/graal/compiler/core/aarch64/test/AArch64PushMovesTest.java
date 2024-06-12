@@ -312,9 +312,9 @@ public class AArch64PushMovesTest extends LIRTest {
         checkCFDetails(38, true, true, false,1);
         checkCFDetails(46, true, true, false,2);
         checkCFDetails(49, true, true, false,3);
-        checkCFDetails(52, true, true, false,4);
+        checkCFDetails(52, true, false, false,4);
         checkCFDetails(53, true, true, false,5);
-        checkCFDetails(59, true, true, false,6);
+        checkCFDetails(59, true, false, false,6);
     }
 
     protected void checkCFDetails(int blockId, boolean canHead, boolean canSlow, boolean canReturn, int bhi) {
