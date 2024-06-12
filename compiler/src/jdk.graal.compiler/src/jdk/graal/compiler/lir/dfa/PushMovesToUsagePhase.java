@@ -6,14 +6,32 @@ import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotReturnOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotUnwindOp;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
+import jdk.graal.compiler.lir.LIRInstruction.OperandFlag;
+import jdk.graal.compiler.lir.LIRInstruction.OperandMode;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.StandardOp.LabelOp;
+import jdk.graal.compiler.lir.aarch64.AArch64ArithmeticOp;
+import jdk.graal.compiler.lir.aarch64.AArch64Compare;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
+import jdk.graal.compiler.lir.aarch64.AArch64Move;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
+import jdk.vm.ci.code.Register;
+import jdk.vm.ci.code.StackSlot;
 import jdk.vm.ci.code.TargetDescription;
+import jdk.vm.ci.meta.Value;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static jdk.vm.ci.code.ValueUtil.asRegister;
+import static jdk.vm.ci.code.ValueUtil.asStackSlot;
+import static jdk.vm.ci.code.ValueUtil.isIllegal;
+import static jdk.vm.ci.code.ValueUtil.isRegister;
+import static jdk.vm.ci.code.ValueUtil.isStackSlot;
 
 public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     public static class BasicBlockBytecodeDetails {
@@ -36,6 +54,25 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         /** This block is on a possible path to a return. */
         public boolean canLeadToReturn;
+
+        /** Written to registers. */
+        public Set<Register> writtenToRegisters;
+
+        /** Registers that are read, without having been written to previously. */
+        public Set<Register> readFromRegisters;
+
+        /** Memory locations that are written to. */
+        public Set<StackSlot> writtenToMemory;
+
+        /** Memory locations that are read from, without having been written to first. */
+        public Set<StackSlot> readFromMemory;
+
+        public void initUsageSets() {
+            writtenToRegisters = new HashSet<>();
+            readFromRegisters = new HashSet<>();
+            writtenToMemory = new HashSet<>();
+            readFromMemory = new HashSet<>();
+        }
 
         @Override
         public String toString() {
@@ -155,6 +192,124 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
+    private static BasicBlockBytecodeDetails getDetails(List<LIRInstruction> instructions) {
+        return (BasicBlockBytecodeDetails) ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData;
+    }
+
+    private static void recordInput(BasicBlockBytecodeDetails details, Value input) {
+        if (isRegister(input)) {
+            Register inputReg = asRegister(input);
+            if (!details.writtenToRegisters.contains(inputReg)) {
+                details.readFromRegisters.add(inputReg);
+            }
+        } else if (isStackSlot(input)) {
+            StackSlot inputSlot = asStackSlot(input);
+            if (!details.writtenToMemory.contains(inputSlot)) {
+                details.readFromMemory.add(inputSlot);
+            }
+        } else if (isIllegal(input)) {
+            // ignore
+        } else {
+            throw new AssertionError("Not yet handled input: " + input);
+        }
+    }
+
+    private static void recordResult(BasicBlockBytecodeDetails details, Value result) {
+        if (isRegister(result)) {
+            details.writtenToRegisters.add(asRegister(result));
+        } else if (isStackSlot(result)) {
+            details.writtenToMemory.add(asStackSlot(result));
+        } else {
+            throw new AssertionError("Not yet handled result: " + result);
+        }
+    }
+
+    private static void establishInputs(PhaseState state, LIR lir) {
+        List<LIRInstruction> currentIs = state.dispatchBlock;
+        var details = getDetails(currentIs);
+        details.initUsageSets();
+
+        // go over the instructions until we reached state.lastDispatchBlock, and process all instructions
+        // to collect the inputs
+
+
+        while (currentIs != null) {
+            for (LIRInstruction ins : currentIs) {
+                switch (ins) {
+                    case LabelOp label -> {
+                        // ignore the label, it's just a marker
+                    }
+                    case AArch64Move.Move m -> {
+                        recordInput(details, m.getInput());
+                        recordResult(details, m.getResult());
+                    }
+                    case AArch64Compare.CompareOp compare -> {
+                        compare.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordInput(details, value);
+                            return value;
+                        });
+                    }
+                    case AArch64ControlFlow.AbstractBranchOp b -> {
+                        BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
+                        var trueInstructions = lir.getLIRforBlock(trueTarget);
+
+                        if (trueInstructions == state.lastDispatchBlock) {
+                            currentIs = trueInstructions;
+                        } else if (((BasicBlockBytecodeDetails) ((LabelOp) trueInstructions.getFirst()).hackPushMovesToUsagePhaseData).canLeadToHeadOfLoop) {
+                            currentIs = trueInstructions;
+                        } else {
+                            BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
+                            var falseInstructions = lir.getLIRforBlock(falseTarget);
+
+                            if (falseInstructions == state.lastDispatchBlock) {
+                                currentIs = falseInstructions;
+                            } else if (((BasicBlockBytecodeDetails) ((LabelOp) falseInstructions.getFirst()).hackPushMovesToUsagePhaseData).canLeadToHeadOfLoop) {
+                                currentIs = falseInstructions;
+                            } else {
+                                throw new AssertionError("We don't know which branch to take..." + b);
+                            }
+                        }
+                    }
+                    case AArch64ArithmeticOp.BinaryConstOp bin -> {
+                        bin.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordInput(details, value);
+                            return value;
+                        });
+                        bin.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordResult(details, value);
+                            return value;
+                        });
+                    }
+                    case AArch64ArithmeticOp.BinaryOp bin -> {
+                        bin.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordInput(details, value);
+                            return value;
+                        });
+                        bin.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordResult(details, value);
+                            return value;
+                        });
+                    }
+                    case AArch64Move.LoadOp load -> {
+                        load.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordInput(details, value);
+                            return value;
+                        });
+                        load.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                            recordResult(details, value);
+                            return value;
+                        });
+                    }
+                    case AArch64ControlFlow.RangeTableSwitchOp r -> {
+                        // we reached the end of the dispatch blocks
+                        currentIs = null;
+                    }
+                    default -> throw new AssertionError("Not yet supported instruction: " + ins);
+                }
+            }
+        }
+    }
+
     private static BasicBlockBytecodeDetails slowPath(StandardOp.LabelOp label) {
         BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails();
         details.fullyProcessed = true;
@@ -214,6 +369,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             // now we have the start of a bytecode handler
             // the next step would be to try to push down a move instruction
 
+            establishInputs(state, lir);
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
 //                case 1: { // TruffleSOM's DUP bytecode
