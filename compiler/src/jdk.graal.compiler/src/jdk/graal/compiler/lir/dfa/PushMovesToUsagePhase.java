@@ -37,6 +37,18 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         /** This block is on a possible path to a return. */
         public boolean canLeadToReturn;
 
+        @Override
+        public String toString() {
+            return "BasicBlockBytecodeDetails{" +
+                    (fullyProcessed ? "t" : "f") +
+                    "," + (leadsToHeadOfLoop ? "t" : "f") +
+                    "," + (leadsToSlowPath ? "t" : "f") +
+                    "," + (leadsToReturn ? "t" : "f") +
+                    "," + (canLeadToHeadOfLoop ? "t" : "f") +
+                    "," + (canLeadToSlowPath ? "t" : "f") +
+                    "," + (canLeadToReturn ? "t" : "f") +
+                    '}';
+        }
     }
 
     private static class PhaseState {
