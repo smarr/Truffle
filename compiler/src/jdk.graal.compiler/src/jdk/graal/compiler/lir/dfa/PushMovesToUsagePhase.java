@@ -38,6 +38,21 @@ import static jdk.vm.ci.code.ValueUtil.isRegister;
 import static jdk.vm.ci.code.ValueUtil.isStackSlot;
 
 public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
+    public static final class InstRef {
+        public final int blockId;
+        public final int instIdx;
+
+        public InstRef(int blockId, int instId) {
+            this.blockId = blockId;
+            this.instIdx = instId;
+        }
+
+        @Override
+        public String toString() {
+            return "InstRef{" + blockId + ":" + instIdx + "}";
+        }
+    }
+
     public static class BasicBlockBytecodeDetails {
         public boolean fullyProcessed;
 
@@ -71,7 +86,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         /** Memory locations that are read from, without having been written to first. */
         public Set<StackSlot> readFromMemory;
 
-        public List<Integer>[] instUsage;
+        public List<InstRef>[] instUsage;
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         public void initUsage(int numberOfInstructions) {
@@ -474,12 +489,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return details;
     }
 
-    private static void recordLastWrite(Integer lastWrite, BasicBlockBytecodeDetails details, int lastUse) {
+    private static void recordLastWrite(InstRef lastWrite, LIR lir, InstRef lastUse) {
         if (lastWrite != null) {
-            if (details.instUsage[lastWrite] == null) {
-                details.instUsage[lastWrite] = new ArrayList<>();
+            List<LIRInstruction> instructions = lir.getLIRforBlock(lir.getBlockById(lastWrite.blockId));
+            BasicBlockBytecodeDetails details = getDetails(instructions);
+            if (details.instUsage[lastWrite.instIdx] == null) {
+                details.instUsage[lastWrite.instIdx] = new ArrayList<>();
             }
-            details.instUsage[lastWrite].add(lastUse);
+            details.instUsage[lastWrite.instIdx].add(lastUse);
         }
     }
 
@@ -492,32 +509,32 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
      *   push moves in there, or whether I can guarantee that it isn't used anywhere
      *
      * How to make sure that I find "global" uses of a register?
-     * @param blockById
+     * @param block
      * @param lir
      * @param dispatchInputs
      */
-    private static void determineRegisterUsage(BasicBlock<?> blockById, LIR lir, Set<Register> dispatchInputs) {
-        var instructions = lir.getLIRforBlock(blockById);
+    private static void determineRegisterUsage(BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs) {
+        var instructions = lir.getLIRforBlock(block);
         var details = getDetailsAndInitializeIfNecessary(instructions);
         assert getBytecodeHandlerIndex(instructions) != -1 : "Block must be a bytecode handler, but isn't";
         assert details.fullyProcessed == true : "Block must be fully processed, but wasn't";
         assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
 
         // live set from register to where it was written
-        HashMap<Register, Integer> liveSet = new HashMap<>();
+        HashMap<Register, InstRef> liveSet = new HashMap<>();
 
         // we go over each instruction and:
         // - if the instruction uses a register, we append the current i to the usage list
         //   of the instruction that wrote to the register
         // - if the instruction writes to a register, we update the live set
         for (int i = 0; i < instructions.size(); i += 1) {
-            final int finalI = i;
+            InstRef inst = new InstRef(block.getId(), i);
             LIRInstruction ins = instructions.get(i);
 
             ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
-                    recordLastWrite(liveSet.get(reg), details, finalI);
+                    recordLastWrite(liveSet.get(reg), lir, inst);
                 }
                 return value;
             });
@@ -525,7 +542,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
-                    liveSet.put(reg, finalI);
+                    liveSet.put(reg, inst);
                 }
                 return value;
             });
@@ -533,7 +550,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         // mark all registers that are used in the dispatch blocks as used by instruction -1
         for (Register reg : dispatchInputs) {
-            recordLastWrite(liveSet.get(reg), details, -1);
+            recordLastWrite(liveSet.get(reg), lir, new InstRef(-1, -1));
         }
     }
 
