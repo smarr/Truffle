@@ -10,6 +10,7 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.dfa.PushMovesToUsagePhase;
 import jdk.graal.compiler.lir.dfa.PushMovesToUsagePhase.BasicBlockBytecodeDetails;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.jtt.LIRTest;
@@ -22,6 +23,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 
 public class AArch64PushMovesTest extends LIRTest {
@@ -315,6 +317,44 @@ public class AArch64PushMovesTest extends LIRTest {
         checkCFDetails(52, true, false, false,4);
         checkCFDetails(53, true, true, false,5);
         checkCFDetails(59, true, false, false,6);
+
+        List<Integer> unused = unusedMove(36);
+        assertTrue(unused.isEmpty());
+
+        unused = unusedMove(38);
+        assertDeepEquals(List.of(1), unused);
+
+        unused = unusedMove(46);
+        assertDeepEquals(List.of(3), unused);
+
+        unused = unusedMove(49);
+        assertDeepEquals(List.of(3), unused);
+
+        unused = unusedMove(52);
+        assertDeepEquals(List.of(2, 3), unused);
+
+        unused = unusedMove(53);
+        assertDeepEquals(List.of(4), unused);
+
+        unused = unusedMove(59);
+        assertDeepEquals(List.of(1, 2), unused);
+    }
+
+    private List<Integer> unusedMove(int blockId) {
+        ArrayList<LIRInstruction> insts = lir.getLIRforBlock(lir.getBlockById(blockId));
+        ArrayList<Integer> unusedMoves = new ArrayList<>();
+
+        for (int i = 0; i < insts.size(); i += 1) {
+            if (insts.get(i) instanceof StandardOp.MoveOp move) {
+                var details = PushMovesToUsagePhase.getDetails(insts);
+                if (details.instUsage[i] == null) {
+                    unusedMoves.add(i);
+                    System.out.println("Unused move at block " + blockId + ":" + i);
+                }
+            }
+        }
+
+        return unusedMoves;
     }
 
     protected void checkCFDetails(int blockId, boolean canHead, boolean canSlow, boolean canReturn, int bhi) {

@@ -316,7 +316,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
-    private static BasicBlockBytecodeDetails getDetails(List<LIRInstruction> instructions) {
+    public static BasicBlockBytecodeDetails getDetails(List<LIRInstruction> instructions) {
         return (BasicBlockBytecodeDetails) ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData;
     }
 
