@@ -165,7 +165,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         public int lastDispatchBlockId = -1;
         public List<LIRInstruction> lastDispatchBlock;
 
-        public final List<ArrayList<LIRInstruction>> bytecodeHandlers = new ArrayList<>();
+        public final List<BasicBlock<?>> bytecodeHandlers = new ArrayList<>();
     }
 
     private static boolean isDispatchBlock(ArrayList<LIRInstruction> instructions) {
@@ -173,7 +173,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             return false;
         }
 
-        LIRInstruction last = instructions.get(instructions.size() - 1);
+        LIRInstruction last = instructions.getLast();
         return last instanceof AArch64ControlFlow.RangeTableSwitchOp;
     }
 
@@ -182,7 +182,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             return false;
         }
 
-        LIRInstruction first = instructions.get(0);
+        LIRInstruction first = instructions.getFirst();
         return first instanceof StandardOp.LabelOp label && label.getBytecodeHandlerIndex() != -1;
     }
 
@@ -208,12 +208,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             return details;
         }
 
-        StandardOp.LabelOp label = (StandardOp.LabelOp) instructions.get(0);
+        StandardOp.LabelOp label = (StandardOp.LabelOp) instructions.getFirst();
         if (label.hackPushMovesToUsagePhaseData != null) {
             return (BasicBlockBytecodeDetails) label.hackPushMovesToUsagePhaseData;
         }
 
-        LIRInstruction last = instructions.get(instructions.size() - 1);
+        LIRInstruction last = instructions.getLast();
         switch (last) {
             case AArch64ControlFlow.AbstractBranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
@@ -420,6 +420,15 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return details;
     }
 
+    private static void recordLastWrite(Integer lastWrite, BasicBlockBytecodeDetails details, int lastUse) {
+        if (lastWrite != null) {
+            if (details.instUsage[lastWrite] == null) {
+                details.instUsage[lastWrite] = new ArrayList<>();
+            }
+            details.instUsage[lastWrite].add(lastUse);
+        }
+    }
+
     private static void determineRegisterUsage(BasicBlock<?> blockById, LIR lir, Set<Register> dispatchInputs) {
         var instructions = lir.getLIRforBlock(blockById);
         var details = getDetailsAndInitializeIfNecessary(instructions);
@@ -438,13 +447,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
-                    Integer lastWrite = liveSet.get(reg);
-                    if (lastWrite != null) {
-                        if (details.instUsage[lastWrite] == null) {
-                            details.instUsage[lastWrite] = new ArrayList<>();
-                        }
-                        details.instUsage[lastWrite].add(finalI);
-                    }
+                    recordLastWrite(liveSet.get(reg), details, finalI);
                 }
                 return value;
             });
@@ -460,13 +463,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         // mark all registers that are used in the dispatch blocks as used by instruction -1
         for (Register reg : dispatchInputs) {
-            Integer lastWrite = liveSet.get(reg);
-            if (lastWrite != null) {
-                if (details.instUsage[lastWrite] == null) {
-                    details.instUsage[lastWrite] = new ArrayList<>();
-                }
-                details.instUsage[lastWrite].add(-1);
-            }
+            recordLastWrite(liveSet.get(reg), details, -1);
         }
     }
 
@@ -514,7 +511,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
             // now, we know we have a bytecode handler
             // 1. remember the bytecode handler
-            state.bytecodeHandlers.add(instructions);
+            state.bytecodeHandlers.add(block);
 
             // 2. establish control flow properties
             establishControlFlowProperties(state, lir, block, instructions, -1);
@@ -524,8 +521,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
             establishInputs(state, lir, state.dispatchBlock);
 
-            for (ArrayList<LIRInstruction> bytecodeHandler : state.bytecodeHandlers) {
-                establishInputs(state, lir, bytecodeHandler);
+            for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
+                establishInputs(state, lir, lir.getLIRforBlock(bytecodeHandlerBlock));
             }
 
             var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
@@ -564,7 +561,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 //                    break;
 //                }
 //                case 20: { // TruffleSOM's PUSH_1 bytecode
-//                    // same dance as above, just without the safe guards...
+//                    // same dance as above, just without the safeguards...
 //                    LIRInstruction spill1 = instructions.get(1);
 //                    AArch64ControlFlow.BitTestAndBranchOp b1 = (AArch64ControlFlow.BitTestAndBranchOp) instructions.get(instructions.size() - 1);
 //                    ArrayList<LIRInstruction> trueInstructions = lir.getLIRforBlock(b1.getTrueDestination().getTargetBlock());
