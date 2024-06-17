@@ -177,7 +177,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return last instanceof AArch64ControlFlow.RangeTableSwitchOp;
     }
 
-    private static boolean isBytecodeHandler(ArrayList<LIRInstruction> instructions) {
+    private static boolean isBytecodeHandler(List<LIRInstruction> instructions) {
         if (instructions.size() < 2) {
             return false;
         }
@@ -186,25 +186,22 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return first instanceof StandardOp.LabelOp label && label.getBytecodeHandlerIndex() != -1;
     }
 
+    private static int getBytecodeHandlerIndex(List<LIRInstruction> instructions) {
+        if (!isBytecodeHandler(instructions)) {
+            throw new AssertionError("Not a bytecode handler: " + instructions);
+        }
+        StandardOp.LabelOp label = (StandardOp.LabelOp) instructions.getFirst();
+        return label.getBytecodeHandlerIndex();
+    }
+
 
     private static BasicBlockBytecodeDetails establishControlFlowProperties(
-            PhaseState state, LIR lir, BasicBlock<?> block, ArrayList<LIRInstruction> instructions, int prevBlockId) {
+            PhaseState state, LIR lir, BasicBlock<?> block, ArrayList<LIRInstruction> instructions) {
         if (instructions == state.dispatchBlock) {
             var details = new BasicBlockBytecodeDetails();
             details.fullyProcessed = true;
             details.leadsToHeadOfLoop = true;
             details.canLeadToHeadOfLoop = true;
-
-            if (prevBlockId < state.dispatchBlockId && prevBlockId != -1) {
-                // We found a block that is before the dispatch block,
-                // and we will have reached `block` from a bytecode handler,
-                // so, we can assume that `block` is part of the bytecode dispatch.
-                // This means, we can replace state.dispatchBlock with `block` to get more precision.
-                BasicBlock<?> prev = lir.getBlockById(prevBlockId);
-                state.dispatchBlockId = prevBlockId;
-                state.dispatchBlock = lir.getLIRforBlock(prev);
-            }
-
             return details;
         }
 
@@ -218,10 +215,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case AArch64ControlFlow.AbstractBranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
 
-                var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget), block.getId());
+                var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget));
 
                 BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
-                var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget), block.getId());
+                var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget));
 
                 var details = new BasicBlockBytecodeDetails();
 
@@ -238,7 +235,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
-                BasicBlockBytecodeDetails details = establishControlFlowProperties(state, lir, target, lir.getLIRforBlock(target), block.getId());
+                BasicBlockBytecodeDetails details = establishControlFlowProperties(state, lir, target, lir.getLIRforBlock(target));
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
@@ -258,6 +255,63 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
             default -> {
                 throw new AssertionError("Unexpected last instruction in block: " + last);
+            }
+        }
+    }
+
+    private static void discoverAllDispatchBlocks(PhaseState state, LIR lir) {
+        assert state.dispatchBlock == null : "Dispatch block already found";
+        assert !state.bytecodeHandlers.isEmpty() : "No bytecode handlers found";
+
+        for (BasicBlock<?> handlerStart : state.bytecodeHandlers) {
+            ArrayList<BasicBlock<?>> workList = new ArrayList<>();
+
+            workList.add(handlerStart);
+
+            while (!workList.isEmpty()) {
+                var block = workList.removeLast();
+
+                if (block.getId() < state.lastDispatchBlockId) {
+                    // we reached a block that is before the last dispatch block
+                    // since we reached it from the start of a bytecode handler,
+                    // I'll assume this is the start of the dispatch blocks
+                    state.dispatchBlockId = block.getId();
+                    state.dispatchBlock = lir.getLIRforBlock(block);
+
+                    var details = new BasicBlockBytecodeDetails();
+                    details.fullyProcessed = true;
+                    details.leadsToHeadOfLoop = true;
+                    details.canLeadToHeadOfLoop = true;
+                    setDetails(state.dispatchBlock, details);
+
+                    // and I think that's all that's needed
+                    return;
+                }
+
+                ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
+                LIRInstruction last = instructions.getLast();
+
+                switch (last) {
+                    case AArch64ControlFlow.AbstractBranchOp b -> {
+                        workList.add(b.getTrueDestination().getTargetBlock());
+                        workList.add(b.getFalseDestination().getTargetBlock());
+                    }
+                    case StandardOp.JumpOp b -> {
+                        workList.add(b.destination().getTargetBlock());
+                    }
+                    case AArch64HotSpotDeoptimizeOp b -> {
+                        // noop, doesn't to the top of the dispatch loop
+                    }
+                    case AArch64HotSpotUnwindOp b -> {
+                        // noop, doesn't to the top of the dispatch loop
+                    }
+                    case AArch64HotSpotReturnOp b -> {
+                        // noop, doesn't to the top of the dispatch loop
+                    }
+                    default -> {
+                        throw new AssertionError("Unexpected last instruction in block: " + last);
+                    }
+                }
             }
         }
     }
@@ -429,9 +483,25 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
+    /**
+     * To determine the register usage of a while bytecode handler,
+     * I need to:
+     * - start at the first block of the handler
+     * - go through the blocks that lead back to the dispatch block
+     * - go into the slow path up to a specific limit to determine whether I need to
+     *   push moves in there, or whether I can guarantee that it isn't used anywhere
+     *
+     * How to make sure that I find "global" uses of a register?
+     * @param blockById
+     * @param lir
+     * @param dispatchInputs
+     */
     private static void determineRegisterUsage(BasicBlock<?> blockById, LIR lir, Set<Register> dispatchInputs) {
         var instructions = lir.getLIRforBlock(blockById);
         var details = getDetailsAndInitializeIfNecessary(instructions);
+        assert getBytecodeHandlerIndex(instructions) != -1 : "Block must be a bytecode handler, but isn't";
+        assert details.fullyProcessed == true : "Block must be fully processed, but wasn't";
+        assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
 
         // live set from register to where it was written
         HashMap<Register, Integer> liveSet = new HashMap<>();
@@ -469,6 +539,88 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
 
 
+
+    private static void findDispatchBlockAndBytecodeHandlers(PhaseState state, LIR lir) {
+        for (int blockId : lir.codeEmittingOrder()) {
+            if (LIR.isBlockDeleted(blockId)) {
+                continue;
+            }
+
+            BasicBlock<?> block = lir.getBlockById(blockId);
+            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
+            assert instructions.get(0) instanceof StandardOp.LabelOp : "First instruction in block must be a label";
+
+            if (isDispatchBlock(instructions)) {
+                assert state.dispatchBlockId == -1 : "Only one dispatch block expected. But found a second one in blockId: " + blockId;
+                // SM: I assume there are multiple dispatch blocks.
+                // This assumption might not be correct, but it's good enough for now
+                // if we need to support a single block at some point (which is the ideal case for performance)
+                // then we need to also set state.dispatchBlock and its id.
+                state.lastDispatchBlockId = blockId;
+                state.lastDispatchBlock = instructions;
+                continue;
+            }
+
+            if (state.lastDispatchBlockId == -1) {
+                // we expect the dispatch block before any bytecode handlers
+                continue;
+            }
+
+            // only handle bytecode handlers
+            if (!isBytecodeHandler(instructions)) {
+                continue;
+            }
+            state.bytecodeHandlers.add(block);
+        }
+    }
+
+    private static void discoverControlFlowOfBytecodeHandlers(PhaseState state, LIR lir) {
+        for (BasicBlock<?> block : state.bytecodeHandlers) {
+            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
+            establishControlFlowProperties(state, lir, block, instructions);
+        }
+    }
+
+    private static void establishInputs(PhaseState state, LIR lir) {
+        establishInputs(state, lir, state.dispatchBlock);
+
+        for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
+            establishInputs(state, lir, lir.getLIRforBlock(bytecodeHandlerBlock));
+        }
+    }
+
+    private static void determineRegisterUsage(PhaseState state, LIR lir) {
+        var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
+
+        for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
+            determineRegisterUsage(bytecodeHandlerBlock, lir, dispatchInputs);
+        }
+    }
+
+    /**
+     * Under which conditions can we push a move instruction into the slow path?
+     *  1. the value read from memory is not an input to the dispatch blocks
+     *  2. the value read from memory is not an input to the remaining fast-path blocks of the bytecode handler
+     *  3. the register is not used as input to other bytecode handlers, i.e., some kind of global value
+     *
+     *  We should therefore, do the following:
+     *  1. determine the input registers for the dispatch blocks
+     *  2. determine the input registers for each bytecode handler
+     *
+     *  Input registers are the registers that are dependent on/read from,
+     *  without previously being written to in the relevant set of blocks
+     *
+     *  Input memory locations:
+     *  It would also be good for the general understanding to have a list of memory locations
+     *  that a set of blocks read from as input.
+     *
+     *  now we have the start of a bytecode handler
+     *  the next step would be to try to push down a move instruction
+     *
+     * @param target
+     * @param lirGenRes
+     * @param context
+     */
     @Override
     protected void run(TargetDescription target, LIRGenerationResult lirGenRes, FinalCodeAnalysisContext context) {
         var state = new PhaseState();
@@ -481,54 +633,21 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         LIR lir = result.getLIR();
 
-        for (int blockId : lir.codeEmittingOrder()) {
-            if (LIR.isBlockDeleted(blockId)) {
-                continue;
-            }
+        // 1. find the dispatch block and bytecode handlers
+        findDispatchBlockAndBytecodeHandlers(state, lir);
 
-            BasicBlock<?> block = lir.getBlockById(blockId);
-            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
-            assert instructions.get(0) instanceof StandardOp.LabelOp : "First instruction in block must be a label";
+        // 2. discover full set of dispatch blocks
+        discoverAllDispatchBlocks(state, lir);
 
-            if (isDispatchBlock(instructions)) {
-                assert state.dispatchBlockId == -1 : "Only one dispatch block expected. But found a second one in blockId: " + blockId;
-                state.dispatchBlockId = blockId;
-                state.dispatchBlock = instructions;
-                state.lastDispatchBlockId = blockId;
-                state.lastDispatchBlock = instructions;
-                continue;
-            }
+        // 3. discover control flow
+        discoverControlFlowOfBytecodeHandlers(state, lir);
 
-            if (state.dispatchBlockId == -1) {
-                // we expect the dispatch block before any bytecode handlers
-                continue;
-            }
+        // 4. establish inputs
+        establishInputs(state, lir);
 
-            // only handle bytecode handlers
-            if (!isBytecodeHandler(instructions)) {
-                continue;
-            }
-
-            // now, we know we have a bytecode handler
-            // 1. remember the bytecode handler
-            state.bytecodeHandlers.add(block);
-
-            // 2. establish control flow properties
-            establishControlFlowProperties(state, lir, block, instructions, -1);
-
-            // now we have the start of a bytecode handler
-            // the next step would be to try to push down a move instruction
-
-            establishInputs(state, lir, state.dispatchBlock);
-
-            for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
-                establishInputs(state, lir, lir.getLIRforBlock(bytecodeHandlerBlock));
-            }
-
-            var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
-
-            determineRegisterUsage(lir.getBlockById(52), lir, dispatchInputs);
-            determineRegisterUsage(lir.getBlockById(56), lir, dispatchInputs);
+        // 5. determine register usage
+        determineRegisterUsage(state, lir);
+    }
 
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
@@ -581,7 +700,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 //                int i =0;
 //                i += 1;
 //            }
-        }
 
 //        ControlFlowGraph cfg = (ControlFlowGraph) result.getLIR().getControlFlowGraph();
 //
@@ -617,5 +735,4 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 //        } catch (ArrayIndexOutOfBoundsException e) {
 //            return;
 //        }
-    }
 }
