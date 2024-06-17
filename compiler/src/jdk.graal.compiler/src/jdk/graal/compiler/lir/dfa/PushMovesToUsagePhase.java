@@ -26,6 +26,7 @@ import jdk.vm.ci.meta.Value;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -70,24 +71,90 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         /** Memory locations that are read from, without having been written to first. */
         public Set<StackSlot> readFromMemory;
 
-        public void initUsageSets() {
+        public List<Integer>[] instUsage;
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public void initUsage(int numberOfInstructions) {
+            if (writtenToRegisters != null) {
+                throw new IllegalStateException("Usage structures already initialized");
+            }
+
             writtenToRegisters = new HashSet<>();
             readFromRegisters = new HashSet<>();
             writtenToMemory = new HashSet<>();
             readFromMemory = new HashSet<>();
+            instUsage = new List[numberOfInstructions];
+        }
+
+        private static String registerSetToString(Set<Register> set) {
+            if (set == null || set.isEmpty()) {
+                return null;
+            }
+
+            boolean first = true;
+            StringBuilder sb = new StringBuilder();
+            sb.append("[");
+            for (Register r : set) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(r.name);
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+
+        private static String stackSetToString(Set<StackSlot> set) {
+            if (set == null || set.isEmpty()) {
+                return null;
+            }
+
+            boolean first = true;
+            StringBuilder sb = new StringBuilder();
+            sb.append("[");
+            for (StackSlot s : set) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(s.toString());
+            }
+            sb.append("]");
+            return sb.toString();
         }
 
         @Override
         public String toString() {
-            return "BasicBlockBytecodeDetails{" +
+            String start = "BasicBlockBytecodeDetails{" +
                     (fullyProcessed ? "t" : "f") +
                     "," + (leadsToHeadOfLoop ? "t" : "f") +
                     "," + (leadsToSlowPath ? "t" : "f") +
                     "," + (leadsToReturn ? "t" : "f") +
                     "," + (canLeadToHeadOfLoop ? "t" : "f") +
                     "," + (canLeadToSlowPath ? "t" : "f") +
-                    "," + (canLeadToReturn ? "t" : "f") +
-                    '}';
+                    "," + (canLeadToReturn ? "t" : "f");
+
+            String desc = registerSetToString(writtenToRegisters);
+            if (desc != null) {
+                start += ",wr" + desc;
+            }
+            desc = registerSetToString(readFromRegisters);
+            if (desc != null) {
+                start += ",rr" + desc;
+            }
+            desc = stackSetToString(writtenToMemory);
+            if (desc != null) {
+                start += ",wm" + desc;
+            }
+            desc = stackSetToString(readFromMemory);
+            if (desc != null) {
+                start += ",rm" + desc;
+            }
+
+            return  start + '}';
         }
     }
 
@@ -199,6 +266,20 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return (BasicBlockBytecodeDetails) ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData;
     }
 
+    private static BasicBlockBytecodeDetails getDetailsAndInitializeIfNecessary(List<LIRInstruction> instructions) {
+        BasicBlockBytecodeDetails details = getDetails(instructions);
+        if (details == null) {
+            details = new BasicBlockBytecodeDetails();
+            details.initUsage(instructions.size());
+            setDetails(instructions, details);
+        }
+        return details;
+    }
+
+    private static void setDetails(List<LIRInstruction> instructions, BasicBlockBytecodeDetails details) {
+        ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData = details;
+    }
+
     private static void recordInput(BasicBlockBytecodeDetails details, Register inputReg) {
         if (!details.writtenToRegisters.contains(inputReg)) {
             details.readFromRegisters.add(inputReg);
@@ -247,7 +328,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static void establishInputs(PhaseState state, LIR lir, List<LIRInstruction> startIns) {
         List<LIRInstruction> currentIs = startIns;
         var details = getDetails(currentIs);
-        details.initUsageSets();
+        details.initUsage(currentIs.size());
 
         // go over the instructions until we reached state.lastDispatchBlock,
         // or the first dispatch block (in the case we processed a bytecode handler)
@@ -339,6 +420,58 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return details;
     }
 
+    private static void determineRegisterUsage(BasicBlock<?> blockById, LIR lir, Set<Register> dispatchInputs) {
+        var instructions = lir.getLIRforBlock(blockById);
+        var details = getDetailsAndInitializeIfNecessary(instructions);
+
+        // live set from register to where it was written
+        HashMap<Register, Integer> liveSet = new HashMap<>();
+
+        // we go over each instruction and:
+        // - if the instruction uses a register, we append the current i to the usage list
+        //   of the instruction that wrote to the register
+        // - if the instruction writes to a register, we update the live set
+        for (int i = 0; i < instructions.size(); i += 1) {
+            final int finalI = i;
+            LIRInstruction ins = instructions.get(i);
+
+            ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                if (isRegister(value)) {
+                    Register reg = asRegister(value);
+                    Integer lastWrite = liveSet.get(reg);
+                    if (lastWrite != null) {
+                        if (details.instUsage[lastWrite] == null) {
+                            details.instUsage[lastWrite] = new ArrayList<>();
+                        }
+                        details.instUsage[lastWrite].add(finalI);
+                    }
+                }
+                return value;
+            });
+
+            ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                if (isRegister(value)) {
+                    Register reg = asRegister(value);
+                    liveSet.put(reg, finalI);
+                }
+                return value;
+            });
+        }
+
+        // mark all registers that are used in the dispatch blocks as used by instruction -1
+        for (Register reg : dispatchInputs) {
+            Integer lastWrite = liveSet.get(reg);
+            if (lastWrite != null) {
+                if (details.instUsage[lastWrite] == null) {
+                    details.instUsage[lastWrite] = new ArrayList<>();
+                }
+                details.instUsage[lastWrite].add(-1);
+            }
+        }
+    }
+
+
+
     @Override
     protected void run(TargetDescription target, LIRGenerationResult lirGenRes, FinalCodeAnalysisContext context) {
         var state = new PhaseState();
@@ -394,6 +527,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             for (ArrayList<LIRInstruction> bytecodeHandler : state.bytecodeHandlers) {
                 establishInputs(state, lir, bytecodeHandler);
             }
+
+            var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
+
+            determineRegisterUsage(lir.getBlockById(52), lir, dispatchInputs);
+            determineRegisterUsage(lir.getBlockById(56), lir, dispatchInputs);
 
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
