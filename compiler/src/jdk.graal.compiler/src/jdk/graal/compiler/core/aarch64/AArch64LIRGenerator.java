@@ -29,7 +29,6 @@ import static jdk.graal.compiler.lir.LIRValueUtil.asVariable;
 import static jdk.graal.compiler.lir.LIRValueUtil.isIntConstant;
 import static jdk.vm.ci.aarch64.AArch64.sp;
 
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.function.Function;
 
@@ -43,7 +42,6 @@ import jdk.graal.compiler.core.common.memory.MemoryOrderMode;
 import jdk.graal.compiler.core.common.spi.LIRKindTool;
 import jdk.graal.compiler.debug.Assertions;
 import jdk.graal.compiler.debug.GraalError;
-import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRFrameState;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRValueUtil;
