@@ -319,8 +319,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             while (!workList.isEmpty()) {
                 var block = workList.removeLast();
 
-                if (block.getId() < state.lastDispatchBlockId) {
-                    // we reached a block that is before the last dispatch block
+                if (block.getId() <= state.lastDispatchBlockId) {
+                    // we reached a block that is before the last dispatch block, or indeed is the last dispatch block
                     // since we reached it from the start of a bytecode handler,
                     // I'll assume this is the start of the dispatch blocks
                     state.dispatchBlockId = block.getId();
