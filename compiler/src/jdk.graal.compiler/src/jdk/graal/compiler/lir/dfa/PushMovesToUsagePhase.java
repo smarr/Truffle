@@ -6,6 +6,10 @@ import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotMove;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotReturnOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotSafepointOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotUnwindOp;
+import jdk.graal.compiler.hotspot.amd64.AMD64DeoptimizeOp;
+import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotReturnOp;
+import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotSafepointOp;
+import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotUnwindOp;
 import jdk.graal.compiler.lir.ConstantValue;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
@@ -17,6 +21,7 @@ import jdk.graal.compiler.lir.aarch64.AArch64ArithmeticOp;
 import jdk.graal.compiler.lir.aarch64.AArch64Compare;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
 import jdk.graal.compiler.lir.aarch64.AArch64Move;
+import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.vm.ci.code.Register;
@@ -212,7 +217,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
 
         LIRInstruction last = instructions.getLast();
-        return last instanceof AArch64ControlFlow.RangeTableSwitchOp;
+        return last instanceof AArch64ControlFlow.RangeTableSwitchOp || last instanceof AMD64ControlFlow.RangeTableSwitchOp;
     }
 
     private static boolean isBytecodeHandler(List<LIRInstruction> instructions) {
@@ -250,7 +255,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         LIRInstruction last = instructions.getLast();
         switch (last) {
-            case AArch64ControlFlow.AbstractBranchOp b -> {
+            case StandardOp.BranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
                 var tDetails = establishControlFlowProperties(state, lir, trueTarget);
 
@@ -279,10 +284,24 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case AArch64HotSpotDeoptimizeOp b -> {
                 return slowPath(label, block);
             }
+            case AMD64DeoptimizeOp b -> {
+                return slowPath(label, block);
+            }
             case AArch64HotSpotUnwindOp b -> {
                 return slowPath(label, block);
             }
+            case AMD64HotSpotUnwindOp b -> {
+                return slowPath(label, block);
+            }
             case AArch64HotSpotReturnOp b -> {
+                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
+                details.fullyProcessed = true;
+                details.leadsToReturn = true;
+                details.canLeadToReturn = true;
+                label.hackPushMovesToUsagePhaseData = details;
+                return details;
+            }
+            case AMD64HotSpotReturnOp b -> {
                 BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
@@ -329,22 +348,22 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 LIRInstruction last = instructions.getLast();
 
                 switch (last) {
-                    case AArch64ControlFlow.AbstractBranchOp b -> {
+                    case StandardOp.BranchOp b -> {
                         workList.add(b.getTrueDestination().getTargetBlock());
                         workList.add(b.getFalseDestination().getTargetBlock());
                     }
                     case StandardOp.JumpOp b -> {
                         workList.add(b.destination().getTargetBlock());
                     }
-                    case AArch64HotSpotDeoptimizeOp b -> {
-                        // noop, doesn't to the top of the dispatch loop
-                    }
-                    case AArch64HotSpotUnwindOp b -> {
-                        // noop, doesn't to the top of the dispatch loop
-                    }
-                    case AArch64HotSpotReturnOp b -> {
-                        // noop, doesn't to the top of the dispatch loop
-                    }
+                    case AArch64HotSpotDeoptimizeOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
+                    case AMD64DeoptimizeOp b -> { /* noop */ }
+
+                    case AArch64HotSpotUnwindOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
+                    case AMD64HotSpotUnwindOp b -> { /* noop */ }
+
+                    case AArch64HotSpotReturnOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
+                    case AMD64HotSpotReturnOp b -> { /* noop */ }
+
                     default -> {
                         throw new AssertionError("Unexpected last instruction in block: " + last);
                     }
@@ -431,17 +450,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     case LabelOp label -> {
                         // ignore the label, it's just a marker
                     }
-                    case AArch64Move.Move m -> {
-                        recordInput(details, m.getInput());
-                        recordResult(details, m.getResult());
-                    }
-                    case AArch64Compare.CompareOp compare -> {
-                        compare.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-                            recordInput(details, value);
-                            return value;
-                        });
-                    }
-                    case AArch64ControlFlow.AbstractBranchOp b -> {
+                    case StandardOp.BranchOp b -> {
                         BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
                         var trueInstructions = lir.getLIRforBlock(trueTarget);
 
@@ -475,20 +484,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         var targetInstructions = lir.getLIRforBlock(target);
                         currentIs = targetInstructions;
                     }
-                    case AArch64ArithmeticOp.BinaryConstOp bin -> {
-                        recordAllInputsAndOutputs(details, bin);
-                    }
-                    case AArch64ArithmeticOp.BinaryOp bin -> {
-                        recordAllInputsAndOutputs(details, bin);
-                    }
-                    case AArch64Move.LoadOp load -> recordAllInputsAndOutputs(details, load);
-                    case AArch64Move.LoadAddressOp load -> recordAllInputsAndOutputs(details, load);
-                    case AArch64Move.LoadInlineConstant load -> {
-                        recordResult(details, load.getResult());
-                    }
-                    case AArch64Move.StoreOp store -> recordAllInputsAndOutputs(details, store);
-                    case AArch64Move.NullCheckOp n -> recordAllInputsAndOutputs(details, n);
                     case AArch64ControlFlow.RangeTableSwitchOp r -> {
+                        // we reached the end of the dispatch blocks
+                        currentIs = null;
+                    }
+                    case AMD64ControlFlow.RangeTableSwitchOp r -> {
                         // we reached the end of the dispatch blocks
                         currentIs = null;
                     }
@@ -496,8 +496,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         recordResult(details, s.getScratchValue());
                         recordInput(details, s.getThreadRegister());
                     }
-                    case AArch64HotSpotMove.CompressPointer p -> recordAllInputsAndOutputs(details, p);
-                    default -> throw new AssertionError("Not yet supported instruction: " + ins);
+                    case AMD64HotSpotSafepointOp s -> {
+                        recordResult(details, s.getScratchValue());
+                        recordInput(details, s.getThreadRegister());
+                    }
+                    case LIRInstruction i -> {
+                        recordAllInputsAndOutputs(details, i);
+                    }
+                    // default -> throw new AssertionError("Not yet supported instruction: " + ins);
                 }
             }
         }
@@ -570,7 +576,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // process the last instruction
         LIRInstruction last = instructions.getLast();
         switch (last) {
-            case AArch64ControlFlow.AbstractBranchOp b -> {
+            case StandardOp.BranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
                 BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
 
@@ -603,6 +609,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case AArch64HotSpotDeoptimizeOp b -> { return; }
             case AArch64HotSpotUnwindOp b -> { return; }
             case AArch64HotSpotReturnOp b -> { return; }
+            case AMD64DeoptimizeOp b -> { return; }
+            case AMD64HotSpotUnwindOp b -> { return; }
+            case AMD64HotSpotReturnOp b -> { return; }
             default -> {
                 throw new AssertionError("Unexpected last instruction in block: " + last);
             }

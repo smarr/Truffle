@@ -248,6 +248,8 @@ public class StandardOp {
      * Marker interface for a LIR operation that is a conditional jump.
      */
     public interface BranchOp extends BlockEndOp {
+        public LabelRef getTrueDestination();
+        public LabelRef getFalseDestination();
     }
 
     /**

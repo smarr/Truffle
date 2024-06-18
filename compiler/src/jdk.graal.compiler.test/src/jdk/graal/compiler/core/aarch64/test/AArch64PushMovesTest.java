@@ -17,6 +17,7 @@ import jdk.graal.compiler.lir.jtt.LIRTest;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.graal.compiler.lir.phases.LIRSuites;
 import jdk.graal.compiler.options.OptionValues;
+import jdk.vm.ci.aarch64.AArch64;
 import jdk.vm.ci.code.TargetDescription;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
@@ -27,6 +28,11 @@ import java.util.List;
 import java.util.function.Predicate;
 
 public class AArch64PushMovesTest extends LIRTest {
+
+    private boolean isAArch64() {
+        return getTarget().arch instanceof AArch64;
+    }
+
     private LIR lir;
 
     /**
