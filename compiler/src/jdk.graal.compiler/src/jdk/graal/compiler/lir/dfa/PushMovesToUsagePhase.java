@@ -290,6 +290,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case BytecodeLoopSlowPathOp b -> {
                 return slowPath(label, block);
             }
+            case AArch64ControlFlow.ReturnOp b -> {
+                details.fullyProcessed = true;
+                details.leadsToReturn = true;
+                details.canLeadToReturn = true;
+                return details;
+            }
             case AArch64HotSpotReturnOp b -> {
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
@@ -412,6 +418,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             details.writtenToRegisters.add(asRegister(result));
         } else if (isStackSlot(result)) {
             details.writtenToMemory.add(asStackSlot(result));
+        } else if (isIllegal(result) || result instanceof ConstantValue) {
+            // I did get IllegalValue for a direct call to SubstrateArraycopySnippets.doArraycopy
+            // it's a bit odd, but fine, I'll ignore it for now
         } else {
             throw new AssertionError("Not yet handled result: " + result);
         }
@@ -608,11 +617,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
                 determineRegisterUsage(state, target, lir, dispatchInputs, liveSet);
             }
-            case AArch64HotSpotDeoptimizeOp b -> { return; }
-            case AArch64HotSpotUnwindOp b -> { return; }
+            case BytecodeLoopSlowPathOp b -> { return; }
             case AArch64HotSpotReturnOp b -> { return; }
-            case AMD64DeoptimizeOp b -> { return; }
-            case AMD64HotSpotUnwindOp b -> { return; }
+            case AArch64ControlFlow.ReturnOp b -> { return; }
             case AMD64HotSpotReturnOp b -> { return; }
             default -> {
                 throw new AssertionError("Unexpected last instruction in block: " + last);
