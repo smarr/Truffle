@@ -328,7 +328,7 @@ public class AArch64PushMovesTest extends LIRTest {
         assertTrue(unused.isEmpty());
 
         unused = unusedMove(38);
-        assertDeepEquals(List.of(1), unused);
+        assertTrue(unused.isEmpty());
 
         unused = unusedMove(46);
         assertDeepEquals(List.of(3), unused);
@@ -340,7 +340,7 @@ public class AArch64PushMovesTest extends LIRTest {
         assertDeepEquals(List.of(2, 3), unused);
 
         unused = unusedMove(53);
-        assertDeepEquals(List.of(4), unused);
+        assertDeepEquals(List.of(3), unused);
 
         unused = unusedMove(59);
         assertDeepEquals(List.of(1, 2), unused);
