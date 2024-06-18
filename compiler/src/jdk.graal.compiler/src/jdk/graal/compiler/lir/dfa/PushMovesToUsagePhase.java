@@ -238,13 +238,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
     private static BasicBlockBytecodeDetails establishControlFlowProperties(PhaseState state, LIR lir, BasicBlock<?> block) {
         ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
-        if (instructions == state.dispatchBlock) {
-            var details = new BasicBlockBytecodeDetails(block);
-            details.fullyProcessed = true;
-            details.leadsToHeadOfLoop = true;
-            details.canLeadToHeadOfLoop = true;
-            return details;
-        }
 
         StandardOp.LabelOp label = (StandardOp.LabelOp) instructions.getFirst();
         if (label.hackPushMovesToUsagePhaseData != null) {
@@ -254,6 +247,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         var details = new BasicBlockBytecodeDetails(block);
         details.fullyProcessed = false;
         label.hackPushMovesToUsagePhaseData = details;
+
+        if (block == state.dispatchBlock) {
+            details.fullyProcessed = true;
+            details.leadsToHeadOfLoop = true;
+            details.canLeadToHeadOfLoop = true;
+            return details;
+        }
 
         LIRInstruction last = instructions.getLast();
         switch (last) {
