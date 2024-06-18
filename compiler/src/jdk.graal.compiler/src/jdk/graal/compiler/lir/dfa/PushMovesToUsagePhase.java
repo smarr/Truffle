@@ -16,6 +16,7 @@ import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRInstruction.OperandFlag;
 import jdk.graal.compiler.lir.LIRInstruction.OperandMode;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ArithmeticOp;
 import jdk.graal.compiler.lir.aarch64.AArch64Compare;
@@ -281,16 +282,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
-            case AArch64HotSpotDeoptimizeOp b -> {
-                return slowPath(label, block);
-            }
-            case AMD64DeoptimizeOp b -> {
-                return slowPath(label, block);
-            }
-            case AArch64HotSpotUnwindOp b -> {
-                return slowPath(label, block);
-            }
-            case AMD64HotSpotUnwindOp b -> {
+            case BytecodeLoopSlowPathOp b -> {
                 return slowPath(label, block);
             }
             case AArch64HotSpotReturnOp b -> {

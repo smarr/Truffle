@@ -48,6 +48,9 @@ import jdk.vm.ci.meta.Value;
  */
 public class StandardOp {
 
+    public interface BytecodeLoopSlowPathOp {
+    }
+
     /**
      * A block delimiter. Every well formed block must contain exactly one such operation and it
      * must be the last operation in the block.

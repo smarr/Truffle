@@ -34,6 +34,7 @@ import jdk.graal.compiler.hotspot.HotSpotBackend;
 import jdk.graal.compiler.hotspot.stubs.UnwindExceptionToCallerStub;
 import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.Opcode;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.aarch64.AArch64Call;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 import jdk.vm.ci.code.CallingConvention;
@@ -44,7 +45,7 @@ import jdk.vm.ci.code.RegisterValue;
  * Removes the current frame and jumps to the {@link UnwindExceptionToCallerStub}.
  */
 @Opcode("UNWIND")
-public final class AArch64HotSpotUnwindOp extends AArch64HotSpotEpilogueOp {
+public final class AArch64HotSpotUnwindOp extends AArch64HotSpotEpilogueOp implements BytecodeLoopSlowPathOp {
     public static final LIRInstructionClass<AArch64HotSpotUnwindOp> TYPE = LIRInstructionClass.create(AArch64HotSpotUnwindOp.class);
 
     @Use protected RegisterValue exception;

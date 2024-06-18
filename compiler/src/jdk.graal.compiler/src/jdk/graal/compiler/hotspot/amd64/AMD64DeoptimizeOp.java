@@ -31,12 +31,13 @@ import jdk.graal.compiler.lir.LIRFrameState;
 import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.Opcode;
 import jdk.graal.compiler.lir.StandardOp.BlockEndOp;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.amd64.AMD64BlockEndOp;
 import jdk.graal.compiler.lir.amd64.AMD64Call;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 
 @Opcode("DEOPT")
-public final class AMD64DeoptimizeOp extends AMD64BlockEndOp implements BlockEndOp {
+public final class AMD64DeoptimizeOp extends AMD64BlockEndOp implements BlockEndOp, BytecodeLoopSlowPathOp {
     public static final LIRInstructionClass<AMD64DeoptimizeOp> TYPE = LIRInstructionClass.create(AMD64DeoptimizeOp.class);
 
     @State private LIRFrameState info;
