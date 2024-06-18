@@ -36,7 +36,7 @@ public class RemoveSafetyPhase extends BasePhase<HighTierContext> {
 
     @Override
     protected void run(StructuredGraph graph, HighTierContext context) {
-        if (!graph.isMyBytecodeLoop) {
+        if (!graph.isClassWhereWeCanRemoveSavety) {
             return;
         }
 
