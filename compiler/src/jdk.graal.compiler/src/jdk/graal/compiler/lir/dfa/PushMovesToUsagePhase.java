@@ -203,11 +203,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
     private static class PhaseState {
-        public int dispatchBlockId = -1;
-        public List<LIRInstruction> dispatchBlock;
-
-        public int lastDispatchBlockId = -1;
-        public List<LIRInstruction> lastDispatchBlock;
+        public BasicBlock<?> dispatchBlock;
+        public BasicBlock<?> lastDispatchBlock;
 
         public final List<BasicBlock<?>> bytecodeHandlers = new ArrayList<>();
     }
@@ -323,18 +320,17 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             while (!workList.isEmpty()) {
                 var block = workList.removeLast();
 
-                if (block.getId() <= state.lastDispatchBlockId) {
+                if (block.getId() <= state.lastDispatchBlock.getId()) {
                     // we reached a block that is before the last dispatch block, or indeed is the last dispatch block
                     // since we reached it from the start of a bytecode handler,
                     // I'll assume this is the start of the dispatch blocks
-                    state.dispatchBlockId = block.getId();
-                    state.dispatchBlock = lir.getLIRforBlock(block);
+                    state.dispatchBlock = block;
 
                     var details = new BasicBlockBytecodeDetails(block);
                     details.fullyProcessed = true;
                     details.leadsToHeadOfLoop = true;
                     details.canLeadToHeadOfLoop = true;
-                    setDetails(state.dispatchBlock, details);
+                    setDetails(lir.getLIRforBlock(state.dispatchBlock), details);
 
                     // and I think that's all that's needed
                     return;
@@ -432,10 +428,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         });
     }
 
-    private static void establishInputs(PhaseState state, LIR lir, List<LIRInstruction> startIns) {
-        List<LIRInstruction> currentIs = startIns;
-        var details = getDetails(currentIs);
-        details.initUsage(currentIs.size());
+    private static void establishInputs(PhaseState state, LIR lir, BasicBlock<?> startBlock) {
+        List<LIRInstruction> currentIs = lir.getLIRforBlock(startBlock);
+        var details = getDetailsAndInitializeIfNecessary(startBlock, currentIs);
 
         // go over the instructions until we reached state.lastDispatchBlock,
         // or the first dispatch block (in the case we processed a bytecode handler)
@@ -450,7 +445,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
                         var trueInstructions = lir.getLIRforBlock(trueTarget);
 
-                        if (trueInstructions == state.lastDispatchBlock) {
+                        if (trueTarget == state.lastDispatchBlock) {
                             currentIs = trueInstructions;
                         } else if (getDetails(trueInstructions).canLeadToHeadOfLoop) {
                             currentIs = trueInstructions;
@@ -458,7 +453,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                             BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
                             var falseInstructions = lir.getLIRforBlock(falseTarget);
 
-                            if (falseInstructions == state.lastDispatchBlock) {
+                            if (falseTarget == state.lastDispatchBlock) {
                                 currentIs = falseInstructions;
                             } else if (getDetails(falseInstructions).canLeadToHeadOfLoop) {
                                 currentIs = falseInstructions;
@@ -597,7 +592,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
-                if (target.getId() == state.dispatchBlockId) {
+                if (target.getId() == state.dispatchBlock.getId()) {
                     // mark all registers that are used in the dispatch blocks as used by instruction -1
                     for (Register reg : dispatchInputs) {
                         if (liveSet.get(reg) != null && liveSet.get(reg).blockId == block.getId()) {
@@ -636,17 +631,16 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             assert instructions.get(0) instanceof StandardOp.LabelOp : "First instruction in block must be a label";
 
             if (isDispatchBlock(instructions)) {
-                assert state.dispatchBlockId == -1 : "Only one dispatch block expected. But found a second one in blockId: " + blockId;
+                assert state.dispatchBlock == null : "Only one dispatch block expected. But found a second one in blockId: " + blockId;
                 // SM: I assume there are multiple dispatch blocks.
                 // This assumption might not be correct, but it's good enough for now
                 // if we need to support a single block at some point (which is the ideal case for performance)
                 // then we need to also set state.dispatchBlock and its id.
-                state.lastDispatchBlockId = blockId;
-                state.lastDispatchBlock = instructions;
+                state.lastDispatchBlock = block;
                 continue;
             }
 
-            if (state.lastDispatchBlockId == -1) {
+            if (state.lastDispatchBlock == null) {
                 // we expect the dispatch block before any bytecode handlers
                 continue;
             }
@@ -669,12 +663,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         establishInputs(state, lir, state.dispatchBlock);
 
         for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
-            establishInputs(state, lir, lir.getLIRforBlock(bytecodeHandlerBlock));
+            establishInputs(state, lir, bytecodeHandlerBlock);
         }
     }
 
     private static void determineRegisterUsage(PhaseState state, LIR lir) {
-        var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
+        var dispatchInputs = getDetails(lir.getLIRforBlock(state.dispatchBlock)).readFromRegisters;
 
         for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
             // live set from register to where it was written
