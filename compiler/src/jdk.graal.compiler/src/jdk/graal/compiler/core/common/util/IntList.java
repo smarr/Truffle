@@ -123,6 +123,15 @@ public final class IntList {
         return array[index];
     }
 
+    public boolean contains(int value) {
+        for (int i = 0; i < size; i += 1) {
+            if (array[i] == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Sets a value at a given index in this list.
      *
