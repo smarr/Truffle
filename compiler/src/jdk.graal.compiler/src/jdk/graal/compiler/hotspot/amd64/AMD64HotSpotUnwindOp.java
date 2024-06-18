@@ -46,7 +46,7 @@ import jdk.vm.ci.code.RegisterValue;
  * Removes the current frame and jumps to the {@link UnwindExceptionToCallerStub}.
  */
 @Opcode("UNWIND")
-final class AMD64HotSpotUnwindOp extends AMD64HotSpotEpilogueBlockEndOp {
+public final class AMD64HotSpotUnwindOp extends AMD64HotSpotEpilogueBlockEndOp {
     public static final LIRInstructionClass<AMD64HotSpotUnwindOp> TYPE = LIRInstructionClass.create(AMD64HotSpotUnwindOp.class);
 
     @Use({REG}) protected RegisterValue exception;

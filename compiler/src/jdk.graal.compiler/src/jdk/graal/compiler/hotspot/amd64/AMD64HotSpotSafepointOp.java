@@ -73,6 +73,14 @@ public final class AMD64HotSpotSafepointOp extends AMD64LIRInstruction {
         temp = tool.getLIRGeneratorTool().newVariable(LIRKind.value(tool.getLIRGeneratorTool().target().arch.getWordKind()));
     }
 
+    public AllocatableValue getScratchValue() {
+        return temp;
+    }
+
+    public Register getThreadRegister() {
+        return thread;
+    }
+
     @Override
     public void emitCode(CompilationResultBuilder crb, AMD64MacroAssembler asm) {
         emitCode(crb, asm, config, false, state, thread, temp instanceof RegisterValue ? ((RegisterValue) temp).getRegister() : null);

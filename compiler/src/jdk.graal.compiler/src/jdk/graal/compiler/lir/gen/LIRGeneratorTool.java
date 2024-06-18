@@ -24,6 +24,7 @@
  */
 package jdk.graal.compiler.lir.gen;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 
 import jdk.graal.compiler.asm.VectorSize;
@@ -37,10 +38,12 @@ import jdk.graal.compiler.core.common.memory.MemoryOrderMode;
 import jdk.graal.compiler.core.common.spi.ForeignCallLinkage;
 import jdk.graal.compiler.core.common.type.Stamp;
 import jdk.graal.compiler.debug.GraalError;
+import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRFrameState;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRValueUtil;
 import jdk.graal.compiler.lir.LabelRef;
+import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.Variable;
 import jdk.graal.compiler.lir.VirtualStackSlot;
 import jdk.graal.compiler.nodes.spi.CoreProviders;
@@ -638,7 +641,13 @@ public interface LIRGeneratorTool extends CoreProviders, DiagnosticLIRGeneratorT
      */
     void emitSpeculationFence();
 
-    void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex);
+    default void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex) {
+        LIR lir = getResult().getLIR();
+        ArrayList<LIRInstruction> lirForBlock = lir.getLIRforBlock(getCurrentBlock());
+        assert lirForBlock.get(0) instanceof StandardOp.LabelOp : "Expected label at start of block";
+        StandardOp.LabelOp label = (StandardOp.LabelOp) lirForBlock.get(0);
+        label.setBytecodeHandlerIndex(bytecodeHandlerIndex);
+    }
 
     /**
      * Write value to the protection key register.
