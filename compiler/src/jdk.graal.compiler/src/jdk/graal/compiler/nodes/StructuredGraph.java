@@ -346,7 +346,9 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
 
     private OptimizationLog optimizationLog;
 
-    public final boolean isMyBytecodeLoop;
+
+    public final boolean isMyBytecodeLoopMethod;
+    public final boolean isClassWhereWeCanRemoveSavety;
 
     private StructuredGraph(String name,
                     ResolvedJavaMethod method,
@@ -379,10 +381,11 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
         this.callerContext = context;
         this.optimizationLog = OptimizationLog.getInstance(this);
 
-        isMyBytecodeLoop = isMyBytecodeLoop(method);
+        isMyBytecodeLoopMethod = isMyBytecodeLoopMethod(method);
+        isClassWhereWeCanRemoveSavety = isMyBytecodeLoopMethod || isClassWhereWeCanRemoveSafety(method);
     }
 
-    private static boolean isMyBytecodeLoop(ResolvedJavaMethod method) {
+    private static boolean isClassWhereWeCanRemoveSafety(ResolvedJavaMethod method) {
         if (method == null) {
             return false;
         }
@@ -393,20 +396,34 @@ public final class StructuredGraph extends Graph implements JavaMethodContext {
             return true;
         }
 
+        return className.startsWith("Ltrufflesom") ||
+                className.startsWith("Lbdt/") ||
+                className.startsWith("Ltools/") ||
+                className.startsWith("Lsom/") ||
+                className.startsWith("Lcd/") ||
+                className.startsWith("Ldeltablue/") ||
+                className.startsWith("Lhavlak/") ||
+                className.startsWith("Ljson/") ||
+                className.startsWith("Lnbody/") ||
+                className.startsWith("Lrichards/");
+    }
+
+
+    private static boolean isMyBytecodeLoopMethod(ResolvedJavaMethod method) {
+        if (method == null) {
+            return false;
+        }
+        String className = method.getDeclaringClass().getName();
+
+        if (className.contains("BytecodeLoopNode") && method.getName().equals("executeGeneric")) {
+            return true;
+        }
+
         if (className.contains("AArch64PushMovesTest") && method.getName().equals("smallBytecodeLoop")) {
             return true;
         }
 
-        return className.startsWith("Ltrufflesom") ||
-                        className.startsWith("Lbdt/") ||
-                        className.startsWith("Ltools/") ||
-                        className.startsWith("Lsom/") ||
-                        className.startsWith("Lcd/") ||
-                        className.startsWith("Ldeltablue/") ||
-                        className.startsWith("Lhavlak/") ||
-                        className.startsWith("Ljson/") ||
-                        className.startsWith("Lnbody/") ||
-                        className.startsWith("Lrichards/");
+        return false;
     }
 
 // private static boolean isBytecodeLoop(ResolvedJavaMethod method) {
