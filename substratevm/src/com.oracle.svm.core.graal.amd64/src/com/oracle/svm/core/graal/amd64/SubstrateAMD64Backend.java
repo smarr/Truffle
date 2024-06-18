@@ -46,6 +46,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.function.BiConsumer;
 
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.nativeimage.ImageSingletons;
 
@@ -528,7 +529,7 @@ public class SubstrateAMD64Backend extends SubstrateBackend implements LIRGenera
      * Marks a point that is unreachable because a previous instruction never returns.
      */
     @Opcode("DEAD_END")
-    public static class DeadEndOp extends LIRInstruction implements BlockEndOp {
+    public static class DeadEndOp extends LIRInstruction implements BlockEndOp, BytecodeLoopSlowPathOp {
         public static final LIRInstructionClass<DeadEndOp> TYPE = LIRInstructionClass.create(DeadEndOp.class);
 
         public DeadEndOp() {

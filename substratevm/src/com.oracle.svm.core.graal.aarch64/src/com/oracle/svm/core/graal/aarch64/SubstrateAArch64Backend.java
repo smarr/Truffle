@@ -38,6 +38,7 @@ import static jdk.vm.ci.code.ValueUtil.asRegister;
 
 import java.util.function.BiConsumer;
 
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import org.graalvm.nativeimage.ImageSingletons;
 
 import com.oracle.svm.core.FrameAccess;
@@ -443,7 +444,7 @@ public class SubstrateAArch64Backend extends SubstrateBackend implements LIRGene
      * Marks a point that is unreachable because a previous instruction never returns.
      */
     @Opcode("DEAD_END")
-    public static class DeadEndOp extends LIRInstruction implements BlockEndOp {
+    public static class DeadEndOp extends LIRInstruction implements BlockEndOp, BytecodeLoopSlowPathOp {
         public static final LIRInstructionClass<DeadEndOp> TYPE = LIRInstructionClass.create(DeadEndOp.class);
 
         public DeadEndOp() {
