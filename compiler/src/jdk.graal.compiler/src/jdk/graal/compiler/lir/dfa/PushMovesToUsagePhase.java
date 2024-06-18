@@ -254,6 +254,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             return (BasicBlockBytecodeDetails) label.hackPushMovesToUsagePhaseData;
         }
 
+        var details = new BasicBlockBytecodeDetails(block);
+        details.fullyProcessed = false;
+        label.hackPushMovesToUsagePhaseData = details;
+
         LIRInstruction last = instructions.getLast();
         switch (last) {
             case StandardOp.BranchOp b -> {
@@ -263,8 +267,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
                 var fDetails = establishControlFlowProperties(state, lir, falseTarget);
 
-                var details = new BasicBlockBytecodeDetails(block);
-
                 details.fullyProcessed = true;
                 details.leadsToHeadOfLoop = tDetails.leadsToHeadOfLoop && fDetails.leadsToHeadOfLoop;
                 details.leadsToSlowPath = tDetails.leadsToSlowPath && fDetails.leadsToSlowPath;
@@ -273,32 +275,34 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 details.canLeadToSlowPath = tDetails.canLeadToSlowPath || fDetails.canLeadToSlowPath;
                 details.canLeadToReturn = tDetails.canLeadToReturn || fDetails.canLeadToReturn;
 
-                label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
-                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(establishControlFlowProperties(state, lir, target), block);
-                label.hackPushMovesToUsagePhaseData = details;
+                var jDetails = establishControlFlowProperties(state, lir, target);
+                details.fullyProcessed = jDetails.fullyProcessed;
+                details.leadsToHeadOfLoop = jDetails.leadsToHeadOfLoop;
+                details.leadsToSlowPath = jDetails.leadsToSlowPath;
+                details.leadsToReturn = jDetails.leadsToReturn;
+                details.canLeadToHeadOfLoop = jDetails.canLeadToHeadOfLoop;
+                details.canLeadToSlowPath = jDetails.canLeadToSlowPath;
+                details.canLeadToReturn = jDetails.canLeadToReturn;
+
                 return details;
             }
             case BytecodeLoopSlowPathOp b -> {
                 return slowPath(label, block);
             }
             case AArch64HotSpotReturnOp b -> {
-                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
                 details.canLeadToReturn = true;
-                label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
             case AMD64HotSpotReturnOp b -> {
-                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
                 details.canLeadToReturn = true;
-                label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
             default -> {
