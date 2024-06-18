@@ -905,15 +905,6 @@ public abstract class AArch64LIRGenerator extends LIRGenerator {
     }
 
     @Override
-    public void markBlockAsBytecodeHandlerStart(int bytecodeHandlerIndex) {
-        LIR lir = getResult().getLIR();
-        ArrayList<LIRInstruction> lirForBlock = lir.getLIRforBlock(getCurrentBlock());
-        assert lirForBlock.get(0) instanceof StandardOp.LabelOp : "Expected label at start of block";
-        StandardOp.LabelOp label = (StandardOp.LabelOp) lirForBlock.get(0);
-        label.setBytecodeHandlerIndex(bytecodeHandlerIndex);
-    }
-
-    @Override
     public void emitZeroMemory(Value address, Value length, boolean isAligned) {
         emitZeroMemory(address, length, isAligned, false, -1);
     }

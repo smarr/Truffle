@@ -118,6 +118,14 @@ public class AMD64ControlFlow {
         protected void jcc(AMD64MacroAssembler masm, boolean negate, LabelRef target) {
             masm.jcc(negate ? condition.negate() : condition, target.label());
         }
+
+        public LabelRef getTrueDestination() {
+            return trueDestination;
+        }
+
+        public LabelRef getFalseDestination() {
+            return falseDestination;
+        }
     }
 
     public static class TestByteBranchOp extends BranchOp {
