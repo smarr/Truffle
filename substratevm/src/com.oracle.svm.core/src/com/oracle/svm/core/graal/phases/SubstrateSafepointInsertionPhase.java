@@ -79,7 +79,7 @@ public class SubstrateSafepointInsertionPhase extends LoopSafepointInsertionPhas
             }
         }
 
-        if (!graph.isMyBytecodeLoop) {
+        if (!graph.isClassWhereWeCanRemoveSavety) {
             /* Insert loop safepoints. */
             super.run(graph, context);
         }
