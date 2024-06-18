@@ -694,14 +694,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
      */
     @Override
     protected void run(TargetDescription target, LIRGenerationResult lirGenRes, FinalCodeAnalysisContext context) {
-        var state = new PhaseState();
-
         LIRGenerationResult result = context.lirGen.getResult();
         String name = result.getCompilationUnitName();
         if (!name.contains("BytecodeLoopNode.executeGeneric") && !name.contains("smallBytecodeLoop")) {
             return;
         }
 
+        var state = new PhaseState();
         LIR lir = result.getLIR();
 
         // 1. find the dispatch block and bytecode handlers
@@ -718,6 +717,28 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         // 5. determine register usage
         determineRegisterUsage(state, lir);
+
+        // show unused registers at the top of the bytecode handlers
+        for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
+            unusedMove(bytecodeHandlerBlock, lir);
+        }
+    }
+
+    private static List<Integer> unusedMove(BasicBlock<?> block, LIR lir) {
+        ArrayList<LIRInstruction> insts = lir.getLIRforBlock(block);
+        ArrayList<Integer> unusedMoves = new ArrayList<>();
+
+        for (int i = 0; i < insts.size(); i += 1) {
+            if (insts.get(i) instanceof StandardOp.MoveOp move) {
+                var details = PushMovesToUsagePhase.getDetails(insts);
+                if (details.instUsage[i] == null) {
+                    unusedMoves.add(i);
+                    System.out.println("Unused move at block " + block.getId() + ":" + i);
+                }
+            }
+        }
+
+        return unusedMoves;
     }
 
 //            // Hard code this for now
