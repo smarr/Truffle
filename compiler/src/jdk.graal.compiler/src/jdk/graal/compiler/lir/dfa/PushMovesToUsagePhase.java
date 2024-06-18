@@ -1,8 +1,8 @@
 package jdk.graal.compiler.lir.dfa;
 
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
+import jdk.graal.compiler.core.common.util.IntList;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotDeoptimizeOp;
-import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotMove;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotReturnOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotSafepointOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotUnwindOp;
@@ -18,10 +18,7 @@ import jdk.graal.compiler.lir.LIRInstruction.OperandMode;
 import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
-import jdk.graal.compiler.lir.aarch64.AArch64ArithmeticOp;
-import jdk.graal.compiler.lir.aarch64.AArch64Compare;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
-import jdk.graal.compiler.lir.aarch64.AArch64Move;
 import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
@@ -95,6 +92,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         public Set<StackSlot> readFromMemory;
 
         public List<InstRef>[] instUsage;
+
+        /** These blocks have already been origin of jumps to the current block. */
+        public IntList registerUseOriginBlockIds;
 
         public BasicBlockBytecodeDetails(BasicBlock<?> block) {
             this.block = block;
@@ -541,6 +541,17 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs, HashMap<Register, InstRef> liveSet) {
         var instructions = lir.getLIRforBlock(block);
         final var details = getDetailsAndInitializeIfNecessary(block, instructions);
+
+        // A basic block from different paths,
+        // and for each of these we would want to update the liveSet, but only once.
+        // so, here we check for that.
+        if (details.registerUseOriginBlockIds == null) {
+            details.registerUseOriginBlockIds = new IntList(2);
+        } else if (details.registerUseOriginBlockIds.contains(block.getId())) {
+            return;
+        }
+        details.registerUseOriginBlockIds.add(block.getId());
+
         assert details.fullyProcessed == true : "Block must be fully processed, but wasn't";
 //        assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
 
