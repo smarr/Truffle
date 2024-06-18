@@ -715,6 +715,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // 1. find the dispatch block and bytecode handlers
         findDispatchBlockAndBytecodeHandlers(state, lir);
 
+        if (state.bytecodeHandlers.isEmpty()) {
+            // no bytecode handlers found
+            // this could the Deopt_Target_Method version of our method
+            // let's just ignore this for now
+            System.out.println("No bytecode handlers found for " + name);
+            return;
+        }
+
         // 2. discover full set of dispatch blocks
         discoverAllDispatchBlocks(state, lir);
 
