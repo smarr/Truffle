@@ -54,6 +54,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
     public static class BasicBlockBytecodeDetails {
+        public final BasicBlock<?> block;
+
         public boolean fullyProcessed;
 
         /** This block leads unconditional to the head of the bytecode loop, i.e., it's a back edge. */
@@ -88,6 +90,21 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         public List<InstRef>[] instUsage;
 
+        public BasicBlockBytecodeDetails(BasicBlock<?> block) {
+            this.block = block;
+        }
+
+        public BasicBlockBytecodeDetails(BasicBlockBytecodeDetails details, BasicBlock<?> block) {
+            this.block = block;
+            this.fullyProcessed = details.fullyProcessed;
+            this.leadsToHeadOfLoop = details.leadsToHeadOfLoop;
+            this.leadsToSlowPath = details.leadsToSlowPath;
+            this.leadsToReturn = details.leadsToReturn;
+            this.canLeadToHeadOfLoop = details.canLeadToHeadOfLoop;
+            this.canLeadToSlowPath = details.canLeadToSlowPath;
+            this.canLeadToReturn = details.canLeadToReturn;
+        }
+
         @SuppressWarnings({"unchecked", "rawtypes"})
         public void initUsage(int numberOfInstructions) {
             if (writtenToRegisters != null) {
@@ -99,6 +116,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             writtenToMemory = new HashSet<>();
             readFromMemory = new HashSet<>();
             instUsage = new List[numberOfInstructions];
+        }
+
+        public void initUsageIfNeeded(int numberOfInstructions) {
+            if (writtenToRegisters == null) {
+                initUsage(numberOfInstructions);
+            }
         }
 
         private static String registerSetToString(Set<Register> set) {
@@ -210,10 +233,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
 
-    private static BasicBlockBytecodeDetails establishControlFlowProperties(
-            PhaseState state, LIR lir, BasicBlock<?> block, ArrayList<LIRInstruction> instructions) {
+    private static BasicBlockBytecodeDetails establishControlFlowProperties(PhaseState state, LIR lir, BasicBlock<?> block) {
+        ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
         if (instructions == state.dispatchBlock) {
-            var details = new BasicBlockBytecodeDetails();
+            var details = new BasicBlockBytecodeDetails(block);
             details.fullyProcessed = true;
             details.leadsToHeadOfLoop = true;
             details.canLeadToHeadOfLoop = true;
@@ -229,13 +252,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         switch (last) {
             case AArch64ControlFlow.AbstractBranchOp b -> {
                 BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
-
-                var tDetails = establishControlFlowProperties(state, lir, trueTarget, lir.getLIRforBlock(trueTarget));
+                var tDetails = establishControlFlowProperties(state, lir, trueTarget);
 
                 BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
-                var fDetails = establishControlFlowProperties(state, lir, falseTarget, lir.getLIRforBlock(falseTarget));
+                var fDetails = establishControlFlowProperties(state, lir, falseTarget);
 
-                var details = new BasicBlockBytecodeDetails();
+                var details = new BasicBlockBytecodeDetails(block);
 
                 details.fullyProcessed = true;
                 details.leadsToHeadOfLoop = tDetails.leadsToHeadOfLoop && fDetails.leadsToHeadOfLoop;
@@ -250,18 +272,18 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
-                BasicBlockBytecodeDetails details = establishControlFlowProperties(state, lir, target, lir.getLIRforBlock(target));
+                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(establishControlFlowProperties(state, lir, target), block);
                 label.hackPushMovesToUsagePhaseData = details;
                 return details;
             }
             case AArch64HotSpotDeoptimizeOp b -> {
-                return slowPath(label);
+                return slowPath(label, block);
             }
             case AArch64HotSpotUnwindOp b -> {
-                return slowPath(label);
+                return slowPath(label, block);
             }
             case AArch64HotSpotReturnOp b -> {
-                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails();
+                BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
                 details.canLeadToReturn = true;
@@ -293,7 +315,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     state.dispatchBlockId = block.getId();
                     state.dispatchBlock = lir.getLIRforBlock(block);
 
-                    var details = new BasicBlockBytecodeDetails();
+                    var details = new BasicBlockBytecodeDetails(block);
                     details.fullyProcessed = true;
                     details.leadsToHeadOfLoop = true;
                     details.canLeadToHeadOfLoop = true;
@@ -335,13 +357,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return (BasicBlockBytecodeDetails) ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData;
     }
 
-    private static BasicBlockBytecodeDetails getDetailsAndInitializeIfNecessary(List<LIRInstruction> instructions) {
+    private static BasicBlockBytecodeDetails getDetailsAndInitializeIfNecessary(BasicBlock<?> block, List<LIRInstruction> instructions) {
         BasicBlockBytecodeDetails details = getDetails(instructions);
         if (details == null) {
-            details = new BasicBlockBytecodeDetails();
-            details.initUsage(instructions.size());
+            details = new BasicBlockBytecodeDetails(block);
             setDetails(instructions, details);
         }
+
+        details.initUsageIfNeeded(instructions.size());
         return details;
     }
 
@@ -480,8 +503,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
-    private static BasicBlockBytecodeDetails slowPath(StandardOp.LabelOp label) {
-        BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails();
+    private static BasicBlockBytecodeDetails slowPath(StandardOp.LabelOp label, BasicBlock<?> block) {
+        BasicBlockBytecodeDetails details = new BasicBlockBytecodeDetails(block);
         details.fullyProcessed = true;
         details.leadsToSlowPath = true;
         details.canLeadToSlowPath = true;
@@ -513,15 +536,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
      * @param lir
      * @param dispatchInputs
      */
-    private static void determineRegisterUsage(BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs) {
+    private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs, HashMap<Register, InstRef> liveSet) {
         var instructions = lir.getLIRforBlock(block);
-        var details = getDetailsAndInitializeIfNecessary(instructions);
-        assert getBytecodeHandlerIndex(instructions) != -1 : "Block must be a bytecode handler, but isn't";
+        final var details = getDetailsAndInitializeIfNecessary(block, instructions);
         assert details.fullyProcessed == true : "Block must be fully processed, but wasn't";
-        assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
-
-        // live set from register to where it was written
-        HashMap<Register, InstRef> liveSet = new HashMap<>();
+//        assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
 
         // we go over each instruction and:
         // - if the instruction uses a register, we append the current i to the usage list
@@ -548,14 +567,47 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             });
         }
 
-        // mark all registers that are used in the dispatch blocks as used by instruction -1
-        for (Register reg : dispatchInputs) {
-            recordLastWrite(liveSet.get(reg), lir, new InstRef(-1, -1));
+        // process the last instruction
+        LIRInstruction last = instructions.getLast();
+        switch (last) {
+            case AArch64ControlFlow.AbstractBranchOp b -> {
+                BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
+                BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
+
+                // got two branches to follow.
+                // since I record instruction usage on the relevant basic block,
+                // I really only need to copy the live set here, and actually only once
+                // this way, I split the branches, and will end up with acurate usage info
+                var liveSet2 = new HashMap<>(liveSet);
+                determineRegisterUsage(state, trueTarget, lir, dispatchInputs, liveSet);
+                determineRegisterUsage(state, falseTarget, lir, dispatchInputs, liveSet2);
+            }
+            case StandardOp.JumpOp b -> {
+                BasicBlock<?> target = b.destination().getTargetBlock();
+                if (target.getId() == state.dispatchBlockId) {
+                    // mark all registers that are used in the dispatch blocks as used by instruction -1
+                    for (Register reg : dispatchInputs) {
+                        if (liveSet.get(reg) != null && liveSet.get(reg).blockId == block.getId()) {
+                            int instIdx = liveSet.get(reg).instIdx;
+                            if (details.instUsage[instIdx] == null) {
+                                details.instUsage[instIdx] = new ArrayList<>();
+                            }
+                            details.instUsage[instIdx].add(new InstRef(-1, -1));
+                        }
+                    }
+                    return;
+                }
+
+                determineRegisterUsage(state, target, lir, dispatchInputs, liveSet);
+            }
+            case AArch64HotSpotDeoptimizeOp b -> { return; }
+            case AArch64HotSpotUnwindOp b -> { return; }
+            case AArch64HotSpotReturnOp b -> { return; }
+            default -> {
+                throw new AssertionError("Unexpected last instruction in block: " + last);
+            }
         }
     }
-
-
-
 
     private static void findDispatchBlockAndBytecodeHandlers(PhaseState state, LIR lir) {
         for (int blockId : lir.codeEmittingOrder()) {
@@ -593,8 +645,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
     private static void discoverControlFlowOfBytecodeHandlers(PhaseState state, LIR lir) {
         for (BasicBlock<?> block : state.bytecodeHandlers) {
-            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
-            establishControlFlowProperties(state, lir, block, instructions);
+            establishControlFlowProperties(state, lir, block);
         }
     }
 
@@ -610,7 +661,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         var dispatchInputs = getDetails(state.dispatchBlock).readFromRegisters;
 
         for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
-            determineRegisterUsage(bytecodeHandlerBlock, lir, dispatchInputs);
+            // live set from register to where it was written
+            HashMap<Register, InstRef> liveSet = new HashMap<>();
+            determineRegisterUsage(state, bytecodeHandlerBlock, lir, dispatchInputs, liveSet);
         }
     }
 
