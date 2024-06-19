@@ -740,6 +740,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
     private static void removeUnusedMoves(PhaseState state, LIR lir) {
+        int numberOfCandidates = 0;
+
+        // first count
         for (int blockId : lir.codeEmittingOrder()) {
             if (LIR.isBlockDeleted(blockId)) {
                 continue;
@@ -762,7 +765,45 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     // so, let's ignore them
                     // and just deal with plain moves
                     if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
+                        numberOfCandidates += 1;
+                    }
+                }
+            }
+        }
+
+        System.out.println("Candidates for Removal: " + numberOfCandidates);
+
+        int numRemoved = 0;
+        for (int blockId : lir.codeEmittingOrder()) {
+            if (LIR.isBlockDeleted(blockId)) {
+                continue;
+            }
+
+            BasicBlock<?> block = lir.getBlockById(blockId);
+            var details = getDetails(lir.getLIRforBlock(block));
+
+            if (details == null || details.instUsage == null) {
+                continue;
+            }
+
+            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
+
+            // we skip the label and the jump/return/deopt/deadend at the end
+            // we go backwards to not mess up the indexes for earlier instructions when removing things
+            for (int i = instructions.size() - 1; i > 0; i -= 1) {
+                if (instructions.get(i) instanceof StandardOp.MoveOp move && details.instUsage[i] == null && isRegister(move.getResult())) {
+                    // I don't really understand what these references are yet.
+                    // so, let's ignore them
+                    // and just deal with plain moves
+                    if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
+                        System.out.println("== Remove: " + instructions.get(i));
+                        System.out.println("==   in blockId: " + blockId + " at idx: " + i);
                         instructions.remove(i);
+
+                        numRemoved += 1;
+
+                        // stop after the first
+                        return;
                     }
                 }
             }
