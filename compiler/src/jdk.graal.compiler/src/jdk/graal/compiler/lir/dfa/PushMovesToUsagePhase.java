@@ -1,5 +1,6 @@
 package jdk.graal.compiler.lir.dfa;
 
+import jdk.graal.compiler.core.common.LIRKind;
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.core.common.util.IntList;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotDeoptimizeOp;
@@ -16,6 +17,7 @@ import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.LIRInstruction.OperandFlag;
 import jdk.graal.compiler.lir.LIRInstruction.OperandMode;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
@@ -23,6 +25,7 @@ import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.vm.ci.code.Register;
+import jdk.vm.ci.code.RegisterValue;
 import jdk.vm.ci.code.StackSlot;
 import jdk.vm.ci.code.TargetDescription;
 import jdk.vm.ci.meta.Value;
@@ -290,19 +293,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             case BytecodeLoopSlowPathOp b -> {
                 return slowPath(label, block);
             }
-            case AArch64ControlFlow.ReturnOp b -> {
-                details.fullyProcessed = true;
-                details.leadsToReturn = true;
-                details.canLeadToReturn = true;
-                return details;
-            }
-            case AArch64HotSpotReturnOp b -> {
-                details.fullyProcessed = true;
-                details.leadsToReturn = true;
-                details.canLeadToReturn = true;
-                return details;
-            }
-            case AMD64HotSpotReturnOp b -> {
+            case BytecodeLoopReturnOp b -> {
                 details.fullyProcessed = true;
                 details.leadsToReturn = true;
                 details.canLeadToReturn = true;
@@ -359,8 +350,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     case AArch64HotSpotUnwindOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
                     case AMD64HotSpotUnwindOp b -> { /* noop */ }
 
-                    case AArch64HotSpotReturnOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
-                    case AMD64HotSpotReturnOp b -> { /* noop */ }
+                    case BytecodeLoopReturnOp b -> { /* noop, doesn't to the top of the dispatch loop */ }
 
                     default -> {
                         throw new AssertionError("Unexpected last instruction in block: " + last);
@@ -618,9 +608,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 determineRegisterUsage(state, target, lir, dispatchInputs, liveSet);
             }
             case BytecodeLoopSlowPathOp b -> { return; }
-            case AArch64HotSpotReturnOp b -> { return; }
-            case AArch64ControlFlow.ReturnOp b -> { return; }
-            case AMD64HotSpotReturnOp b -> { return; }
+            case BytecodeLoopReturnOp b -> { return; }
+
             default -> {
                 throw new AssertionError("Unexpected last instruction in block: " + last);
             }
