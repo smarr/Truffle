@@ -35,6 +35,7 @@ import jdk.graal.compiler.asm.aarch64.AArch64MacroAssembler;
 import jdk.graal.compiler.hotspot.GraalHotSpotVMConfig;
 import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.Opcode;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 import jdk.graal.compiler.lir.gen.DiagnosticLIRGeneratorTool.ZapStackArgumentSpaceBeforeInstruction;
 
@@ -45,7 +46,7 @@ import jdk.vm.ci.meta.Value;
  * Returns from a function.
  */
 @Opcode("RETURN")
-public final class AArch64HotSpotReturnOp extends AArch64HotSpotEpilogueOp implements ZapStackArgumentSpaceBeforeInstruction {
+public final class AArch64HotSpotReturnOp extends AArch64HotSpotEpilogueOp implements ZapStackArgumentSpaceBeforeInstruction, BytecodeLoopReturnOp {
 
     public static final LIRInstructionClass<AArch64HotSpotReturnOp> TYPE = LIRInstructionClass.create(AArch64HotSpotReturnOp.class);
 

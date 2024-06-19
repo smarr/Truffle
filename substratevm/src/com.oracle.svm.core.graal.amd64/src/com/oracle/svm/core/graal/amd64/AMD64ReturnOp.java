@@ -37,7 +37,7 @@ import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 import jdk.vm.ci.meta.Value;
 
 @Opcode("RETURN")
-public class AMD64ReturnOp extends AMD64BlockEndOp implements StandardOp.BlockEndOp {
+public class AMD64ReturnOp extends AMD64BlockEndOp implements StandardOp.BlockEndOp, StandardOp.BytecodeLoopReturnOp {
     public static final LIRInstructionClass<AMD64ReturnOp> TYPE = LIRInstructionClass.create(AMD64ReturnOp.class);
     @Use({REG, ILLEGAL}) protected Value x;
 

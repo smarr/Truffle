@@ -39,6 +39,7 @@ import jdk.graal.compiler.hotspot.HotSpotHostBackend;
 import jdk.graal.compiler.hotspot.meta.HotSpotForeignCallsProvider;
 import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.Opcode;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.amd64.AMD64Call;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 import jdk.graal.compiler.lir.gen.DiagnosticLIRGeneratorTool.ZapStackArgumentSpaceBeforeInstruction;
@@ -52,7 +53,7 @@ import jdk.vm.ci.meta.Value;
  * Returns from a function.
  */
 @Opcode("RETURN")
-public final class AMD64HotSpotReturnOp extends AMD64HotSpotEpilogueBlockEndOp implements ZapStackArgumentSpaceBeforeInstruction {
+public final class AMD64HotSpotReturnOp extends AMD64HotSpotEpilogueBlockEndOp implements ZapStackArgumentSpaceBeforeInstruction, BytecodeLoopReturnOp {
 
     public static final LIRInstructionClass<AMD64HotSpotReturnOp> TYPE = LIRInstructionClass.create(AMD64HotSpotReturnOp.class);
     @Use({REG, ILLEGAL}) protected Value value;

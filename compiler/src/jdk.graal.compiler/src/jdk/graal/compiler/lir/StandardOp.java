@@ -51,6 +51,8 @@ public class StandardOp {
     public interface BytecodeLoopSlowPathOp {
     }
 
+    public interface BytecodeLoopReturnOp {}
+
     /**
      * A block delimiter. Every well formed block must contain exactly one such operation and it
      * must be the last operation in the block.
