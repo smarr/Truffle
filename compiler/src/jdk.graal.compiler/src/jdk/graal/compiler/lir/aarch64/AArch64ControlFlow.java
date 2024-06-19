@@ -53,6 +53,7 @@ import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.LabelRef;
 import jdk.graal.compiler.lir.Opcode;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.SwitchStrategy;
 import jdk.graal.compiler.lir.SwitchStrategy.BaseSwitchClosure;
 import jdk.graal.compiler.lir.Variable;
@@ -66,7 +67,7 @@ import jdk.vm.ci.meta.PlatformKind;
 import jdk.vm.ci.meta.Value;
 
 public class AArch64ControlFlow {
-    public static final class ReturnOp extends AArch64BlockEndOp {
+    public static final class ReturnOp extends AArch64BlockEndOp implements BytecodeLoopReturnOp {
         public static final LIRInstructionClass<ReturnOp> TYPE = LIRInstructionClass.create(ReturnOp.class);
         @Use({REG, ILLEGAL}) protected Value x;
 
