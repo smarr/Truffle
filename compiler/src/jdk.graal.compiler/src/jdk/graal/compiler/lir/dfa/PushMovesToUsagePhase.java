@@ -553,7 +553,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // - if the instruction uses a register, we append the current i to the usage list
         //   of the instruction that wrote to the register
         // - if the instruction writes to a register, we update the live set
-        for (int i = 0; i < instructions.size(); i += 1) {
+        for (int i = 1; i < instructions.size(); i += 1) {
             InstRef inst = new InstRef(block.getId(), i);
             LIRInstruction ins = instructions.get(i);
 
