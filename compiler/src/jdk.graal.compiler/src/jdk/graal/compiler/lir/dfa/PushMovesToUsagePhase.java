@@ -508,7 +508,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return details;
     }
 
-    private static void recordLastWrite(InstRef lastWrite, LIR lir, InstRef lastUse) {
+    private static void recordUse(InstRef lastWrite, LIR lir, InstRef lastUse) {
         if (lastWrite != null) {
             List<LIRInstruction> instructions = lir.getLIRforBlock(lir.getBlockById(lastWrite.blockId));
             BasicBlockBytecodeDetails details = getDetails(instructions);
@@ -560,7 +560,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
-                    recordLastWrite(liveSet.get(reg), lir, inst);
+                    recordUse(liveSet.get(reg), lir, inst);
                 }
                 return value;
             });
