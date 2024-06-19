@@ -532,7 +532,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
      * @param lir
      * @param dispatchInputs
      */
-    private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs, HashMap<Register, InstRef> liveSet) {
+    private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs, HashMap<Register, InstRef> liveSet, int originBlockId) {
         var instructions = lir.getLIRforBlock(block);
         final var details = getDetailsAndInitializeIfNecessary(block, instructions);
 
@@ -541,10 +541,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // so, here we check for that.
         if (details.registerUseOriginBlockIds == null) {
             details.registerUseOriginBlockIds = new IntList(2);
-        } else if (details.registerUseOriginBlockIds.contains(block.getId())) {
+        } else if (details.registerUseOriginBlockIds.contains(originBlockId)) {
             return;
         }
-        details.registerUseOriginBlockIds.add(block.getId());
+        details.registerUseOriginBlockIds.add(originBlockId);
 
         assert details.fullyProcessed == true : "Block must be fully processed, but wasn't";
 //        assert details.canLeadToHeadOfLoop || details.canLeadToReturn : "Block is expected either lead to dispatch or return";
@@ -586,8 +586,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 // I really only need to copy the live set here, and actually only once
                 // this way, I split the branches, and will end up with acurate usage info
                 var liveSet2 = new HashMap<>(liveSet);
-                determineRegisterUsage(state, trueTarget, lir, dispatchInputs, liveSet);
-                determineRegisterUsage(state, falseTarget, lir, dispatchInputs, liveSet2);
+                determineRegisterUsage(state, trueTarget, lir, dispatchInputs, liveSet, block.getId());
+                determineRegisterUsage(state, falseTarget, lir, dispatchInputs, liveSet2, block.getId());
             }
             case StandardOp.JumpOp b -> {
                 BasicBlock<?> target = b.destination().getTargetBlock();
@@ -605,7 +605,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     return;
                 }
 
-                determineRegisterUsage(state, target, lir, dispatchInputs, liveSet);
+                determineRegisterUsage(state, target, lir, dispatchInputs, liveSet, block.getId());
             }
             case BytecodeLoopSlowPathOp b -> { return; }
             case BytecodeLoopReturnOp b -> { return; }
@@ -669,7 +669,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
             // live set from register to where it was written
             HashMap<Register, InstRef> liveSet = new HashMap<>();
-            determineRegisterUsage(state, bytecodeHandlerBlock, lir, dispatchInputs, liveSet);
+            determineRegisterUsage(state, bytecodeHandlerBlock, lir, dispatchInputs, liveSet, -1);
         }
     }
 
