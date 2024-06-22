@@ -803,7 +803,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         numRemoved += 1;
 
                         // stop after the first
-                        return;
+                        // return;
                     }
                 }
             }
