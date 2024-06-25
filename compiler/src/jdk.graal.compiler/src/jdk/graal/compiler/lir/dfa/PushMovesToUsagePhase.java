@@ -458,7 +458,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // or the first dispatch block (in the case we processed a bytecode handler)
         // and process all instructions to collect the inputs
         while (currentIs != null) {
-            for (int i = 1 /* ignore the label*/; i < currentIs.size(); i += 1) {
+            assert currentBlock != null;
+
+            for (int i = 1 /* ignore the label*/; currentIs != null && i < currentIs.size(); i += 1) {
+                assert currentBlock != null;
+
                 LIRInstruction ins = currentIs.get(i);
                 switch (ins) {
                     case StandardOp.BranchOp b -> {
