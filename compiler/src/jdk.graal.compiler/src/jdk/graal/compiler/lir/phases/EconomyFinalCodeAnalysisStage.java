@@ -32,7 +32,7 @@ public class EconomyFinalCodeAnalysisStage extends LIRPhaseSuite<FinalCodeAnalys
 
     @SuppressWarnings("this-escape")
     public EconomyFinalCodeAnalysisStage() {
-        appendPhase(new PushMovesToUsagePhase());
+//        appendPhase(new PushMovesToUsagePhase());
         appendPhase(new LocationMarkerPhase());
     }
 }
