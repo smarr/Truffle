@@ -18,7 +18,9 @@ import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
+import jdk.graal.compiler.lir.StandardOp.ValueMoveOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
+import jdk.graal.compiler.lir.aarch64.AArch64Move.Move;
 import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
@@ -49,6 +51,19 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         public InstRef(int blockId, int instId) {
             this.blockId = blockId;
             this.instIdx = instId;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof InstRef other) {
+                return blockId == other.blockId && instIdx == other.instIdx;
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return blockId * 31 + instIdx;
         }
 
         @Override
@@ -709,6 +724,118 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
+    private static void findTooEagerRegisterSpills(PhaseState state, LIR lir) {
+        for (BasicBlock<?> bytecodeHandlerStart : state.bytecodeHandlers) {
+            findTooEagerRegisterSpills(state, bytecodeHandlerStart, lir);
+        }
+    }
+
+    /** We assume that for all dispatch blocks, the block id is smaller or equal to the block id of the last dispatch block. */
+    private static boolean isNotInDispatchBlock(PhaseState state, InstRef instRef) {
+        return instRef.blockId > state.lastDispatchBlock.getId();
+    }
+
+    /** Single instruction accessing the stack slot, but not from the dispatch blocks. */
+    private static List<Entry<StackSlot, List<InstRef>>> doneOnce(PhaseState state, Set<Entry<StackSlot, List<InstRef>>> set) {
+        List<Entry<StackSlot, List<InstRef>>> result = new ArrayList<>();
+        for (Entry<StackSlot, List<InstRef>> entry : set) {
+            List<InstRef> instructions = entry.getValue();
+            if (instructions.size() == 1 && isNotInDispatchBlock(state, instructions.get(0))) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+
+    private static LIRInstruction getInstruction(LIR lir, InstRef instRef) {
+        return lir.getLIRforBlock(lir.getBlockById(instRef.blockId)).get(instRef.instIdx);
+    }
+
+    private static void deleteInstruction(LIR lir, InstRef instRef) {
+        var instructions = lir.getLIRforBlock(lir.getBlockById(instRef.blockId));
+        instructions.remove(instRef.instIdx);
+    }
+
+    private static void findTooEagerRegisterSpills(PhaseState state, BasicBlock<?> start, LIR lir) {
+        var details = getDetails(lir.getLIRforBlock(start));
+        assert details != null : "Details not found for block: " + start;
+
+        // find all the memory locations that written to once, in the bytecode handler
+        // these might be register spills
+        List<Entry<StackSlot, List<InstRef>>> candidates = doneOnce(state, details.writtenToMemory.entrySet());
+
+        List<Entry<StackSlot, List<InstRef>>> remainingCandidates = new ArrayList<>();
+
+        List<InstRef> unnecesarySpillOperations = new ArrayList<>();
+
+        for (var slotAccesses : candidates) {
+            // find the candidates that are then read back again
+            if (details.allMemoryReads.containsKey(slotAccesses.getKey())) {
+                remainingCandidates.add(slotAccesses);
+            }
+        }
+
+        if (remainingCandidates.isEmpty()) {
+            return;
+        }
+
+        // make sure the register is not used else where
+        for (var slotAccess : remainingCandidates) {
+            InstRef instRef = slotAccess.getValue().getFirst();
+            LIRInstruction inst = getInstruction(lir, instRef);
+
+            if (inst instanceof ValueMoveOp move) {
+                var input = move.getInput();
+                var output = move.getResult();
+                if (isRegister(input) && isStackSlot(output)) {
+                    Register reg = asRegister(input);
+                    StackSlot slot = asStackSlot(output);
+
+                    // make sure the reads are either in the dispatch blocks, or the read we started with
+                    var allReads = details.allRegisterReads.get(reg);
+                    boolean instsAreInDispatchBlockOrCandidate = true;
+                    for (InstRef read : allReads) {
+                        if (isNotInDispatchBlock(state, read) && !read.equals(instRef)) {
+                            instsAreInDispatchBlockOrCandidate = false;
+                            break;
+                        }
+                    }
+
+                    if (!instsAreInDispatchBlockOrCandidate) {
+                        break;
+                    }
+
+                    // make sure the write is the one write we found
+                    var allWrites = details.writtenToRegisters.get(reg);
+
+                    if (allWrites == null || allWrites.size() > 1) {
+                        break;
+                    }
+
+                    LIRInstruction writeInst = getInstruction(lir, allWrites.getFirst());
+                    if (writeInst instanceof ValueMoveOp move2) {
+                        var i2 = move2.getInput();
+                        var o2 = move2.getResult();
+
+                        if (isStackSlot(i2) && isRegister(o2) && asStackSlot(i2).equals(slot) && asRegister(o2).equals(reg)) {
+                            unnecesarySpillOperations.add(instRef);
+                            unnecesarySpillOperations.add(allWrites.getFirst());
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!unnecesarySpillOperations.isEmpty()) {
+            System.out.println("Removing unnecessary Spill Operations: ");
+            for (InstRef instRef : unnecesarySpillOperations) {
+                System.out.println("  " + instRef);
+                deleteInstruction(lir, instRef);
+            }
+        }
+    }
+
     /**
      * Under which conditions can we push a move instruction into the slow path?
      *  1. the value read from memory is not an input to the dispatch blocks
@@ -767,11 +894,14 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // 5. determine register usage
         determineRegisterUsage(state, lir);
 
+        // 6. find bytecode handlers that spill register, but only use it on slow path
+        findTooEagerRegisterSpills(state, lir);
+
         // show unused registers at the top of the bytecode handlers
         for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
             unusedMove(bytecodeHandlerBlock, lir);
         }
-        
+
         removeUnusedMoves(state, lir);
     }
 
