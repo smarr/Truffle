@@ -4,11 +4,9 @@ import jdk.graal.compiler.core.common.LIRKind;
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.core.common.util.IntList;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotDeoptimizeOp;
-import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotReturnOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotSafepointOp;
 import jdk.graal.compiler.hotspot.aarch64.AArch64HotSpotUnwindOp;
 import jdk.graal.compiler.hotspot.amd64.AMD64DeoptimizeOp;
-import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotReturnOp;
 import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotSafepointOp;
 import jdk.graal.compiler.hotspot.amd64.AMD64HotSpotUnwindOp;
 import jdk.graal.compiler.lir.ConstantValue;
@@ -25,7 +23,6 @@ import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.vm.ci.code.Register;
-import jdk.vm.ci.code.RegisterValue;
 import jdk.vm.ci.code.StackSlot;
 import jdk.vm.ci.code.TargetDescription;
 import jdk.vm.ci.meta.Value;
@@ -33,8 +30,9 @@ import jdk.vm.ci.meta.Value;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import static jdk.vm.ci.code.ValueUtil.asRegister;
@@ -82,17 +80,25 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         /** This block is on a possible path to a return. */
         public boolean canLeadToReturn;
 
-        /** Written to registers. */
-        public Set<Register> writtenToRegisters;
+        /** The instructions that wrote to a register. */
+        public Map<Register, List<InstRef>> writtenToRegisters;
 
-        /** Registers that are read, without having been written to previously. */
-        public Set<Register> readFromRegisters;
+        /**
+         * Registers that are read, without having been written to previously,
+         * and the instructions reading them.
+         */
+        public Map<Register, List<InstRef>> readFromRegisters;
 
-        /** Memory locations that are written to. */
-        public Set<StackSlot> writtenToMemory;
+        public Map<Register, List<InstRef>> allRegisterReads;
+
+        /** Memory locations that are written to, incl. instructions. */
+        public Map<StackSlot, List<InstRef>> writtenToMemory;
 
         /** Memory locations that are read from, without having been written to first. */
-        public Set<StackSlot> readFromMemory;
+        public Map<StackSlot, List<InstRef>> readFromMemory;
+
+        public Map<StackSlot, List<InstRef>> allMemoryReads;
+
 
         public List<InstRef>[] instUsage;
 
@@ -120,10 +126,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 throw new IllegalStateException("Usage structures already initialized");
             }
 
-            writtenToRegisters = new HashSet<>();
-            readFromRegisters = new HashSet<>();
-            writtenToMemory = new HashSet<>();
-            readFromMemory = new HashSet<>();
+            writtenToRegisters = new HashMap<>();
+            readFromRegisters = new HashMap<>();
+            allRegisterReads = new HashMap<>();
+            writtenToMemory = new HashMap<>();
+            readFromMemory = new HashMap<>();
+            allMemoryReads = new HashMap<>();
             instUsage = new List[numberOfInstructions];
         }
 
@@ -133,15 +141,15 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             }
         }
 
-        private static String registerSetToString(Set<Register> set) {
-            if (set == null || set.isEmpty()) {
+        private static String registerMapToString(Map<Register, ?> map) {
+            if (map == null || map.isEmpty()) {
                 return null;
             }
 
             boolean first = true;
             StringBuilder sb = new StringBuilder();
             sb.append("[");
-            for (Register r : set) {
+            for (Register r : map.keySet()) {
                 if (first) {
                     first = false;
                 } else {
@@ -153,15 +161,15 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             return sb.toString();
         }
 
-        private static String stackSetToString(Set<StackSlot> set) {
-            if (set == null || set.isEmpty()) {
+        private static String stackMapToString(Map<StackSlot, List<InstRef>> map) {
+            if (map == null || map.isEmpty()) {
                 return null;
             }
 
             boolean first = true;
             StringBuilder sb = new StringBuilder();
             sb.append("[");
-            for (StackSlot s : set) {
+            for (StackSlot s : map.keySet()) {
                 if (first) {
                     first = false;
                 } else {
@@ -184,19 +192,19 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     "," + (canLeadToSlowPath ? "t" : "f") +
                     "," + (canLeadToReturn ? "t" : "f");
 
-            String desc = registerSetToString(writtenToRegisters);
+            String desc = registerMapToString(writtenToRegisters);
             if (desc != null) {
                 start += ",wr" + desc;
             }
-            desc = registerSetToString(readFromRegisters);
+            desc = registerMapToString(readFromRegisters);
             if (desc != null) {
                 start += ",rr" + desc;
             }
-            desc = stackSetToString(writtenToMemory);
+            desc = stackMapToString(writtenToMemory);
             if (desc != null) {
                 start += ",wm" + desc;
             }
-            desc = stackSetToString(readFromMemory);
+            desc = stackMapToString(readFromMemory);
             if (desc != null) {
                 start += ",rm" + desc;
             }
@@ -379,23 +387,35 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         ((LabelOp) instructions.getFirst()).hackPushMovesToUsagePhaseData = details;
     }
 
-    private static void recordInput(BasicBlockBytecodeDetails details, Register inputReg) {
-        if (!details.writtenToRegisters.contains(inputReg)) {
-            details.readFromRegisters.add(inputReg);
+    private static <T> void addToList(Map<T, List<InstRef>> map, T key, InstRef instRef) {
+        if (!map.containsKey(key)) {
+            map.put(key, new ArrayList<>());
         }
+        map.get(key).add(instRef);
     }
 
-    private static void recordInput(BasicBlockBytecodeDetails details, Value input) {
+    private static void recordInput(BasicBlockBytecodeDetails details, Register inputReg, InstRef instRef) {
+        if (!details.writtenToRegisters.containsKey(inputReg)) {
+            addToList(details.readFromRegisters, inputReg, instRef);
+        }
+
+        addToList(details.allRegisterReads, inputReg, instRef);
+    }
+
+    private static void recordInput(BasicBlockBytecodeDetails details, Value input, InstRef instRef) {
         if (isRegister(input)) {
             Register inputReg = asRegister(input);
-            if (!details.writtenToRegisters.contains(inputReg)) {
-                details.readFromRegisters.add(inputReg);
+            if (!details.writtenToRegisters.containsKey(inputReg)) {
+                addToList(details.readFromRegisters, inputReg, instRef);
             }
+            addToList(details.allRegisterReads, inputReg, instRef);
         } else if (isStackSlot(input)) {
             StackSlot inputSlot = asStackSlot(input);
-            if (!details.writtenToMemory.contains(inputSlot)) {
-                details.readFromMemory.add(inputSlot);
+            if (!details.writtenToMemory.containsKey(inputSlot)) {
+                addToList(details.readFromMemory, inputSlot, instRef);
             }
+
+            addToList(details.allMemoryReads, inputSlot, instRef);
         } else if (isIllegal(input) || input instanceof ConstantValue) {
             // ignore
         } else {
@@ -403,11 +423,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
-    private static void recordResult(BasicBlockBytecodeDetails details, Value result) {
+    private static void recordResult(BasicBlockBytecodeDetails details, Value result, InstRef instRef) {
         if (isRegister(result)) {
-            details.writtenToRegisters.add(asRegister(result));
+            addToList(details.writtenToRegisters, asRegister(result), instRef);
         } else if (isStackSlot(result)) {
-            details.writtenToMemory.add(asStackSlot(result));
+            addToList(details.writtenToMemory, asStackSlot(result), instRef);
         } else if (isIllegal(result) || result instanceof ConstantValue) {
             // I did get IllegalValue for a direct call to SubstrateArraycopySnippets.doArraycopy
             // it's a bit odd, but fine, I'll ignore it for now
@@ -416,46 +436,51 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
-    private static void recordAllInputsAndOutputs(BasicBlockBytecodeDetails details, LIRInstruction ins) {
+    private static void recordAllInputsAndOutputs(BasicBlockBytecodeDetails details, LIRInstruction ins, InstRef instRef) {
         ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-            recordInput(details, value);
+            recordInput(details, value, instRef);
             return value;
         });
         ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
-            recordResult(details, value);
+            recordResult(details, value, instRef);
             return value;
         });
     }
 
     private static void establishInputs(PhaseState state, LIR lir, BasicBlock<?> startBlock) {
         List<LIRInstruction> currentIs = lir.getLIRforBlock(startBlock);
+        assert currentIs != null : "No LIR for block: " + startBlock;
+
+        BasicBlock<?> currentBlock = startBlock;
         var details = getDetailsAndInitializeIfNecessary(startBlock, currentIs);
 
         // go over the instructions until we reached state.lastDispatchBlock,
         // or the first dispatch block (in the case we processed a bytecode handler)
         // and process all instructions to collect the inputs
         while (currentIs != null) {
-            for (LIRInstruction ins : currentIs) {
+            for (int i = 1 /* ignore the label*/; i < currentIs.size(); i += 1) {
+                LIRInstruction ins = currentIs.get(i);
                 switch (ins) {
-                    case LabelOp label -> {
-                        // ignore the label, it's just a marker
-                    }
                     case StandardOp.BranchOp b -> {
                         BasicBlock<?> trueTarget = b.getTrueDestination().getTargetBlock();
                         var trueInstructions = lir.getLIRforBlock(trueTarget);
 
                         if (trueTarget == state.lastDispatchBlock) {
                             currentIs = trueInstructions;
+                            currentBlock = trueTarget;
                         } else if (getDetails(trueInstructions).canLeadToHeadOfLoop) {
                             currentIs = trueInstructions;
+                            currentBlock = trueTarget;
                         } else {
                             BasicBlock<?> falseTarget = b.getFalseDestination().getTargetBlock();
                             var falseInstructions = lir.getLIRforBlock(falseTarget);
 
                             if (falseTarget == state.lastDispatchBlock) {
                                 currentIs = falseInstructions;
+                                currentBlock = falseTarget;
                             } else if (getDetails(falseInstructions).canLeadToHeadOfLoop) {
                                 currentIs = falseInstructions;
+                                currentBlock = falseTarget;
                             } else {
                                 // none of the options lead back to the head of loop it seems
                                 // ok, fine, let's see whether we can get to a return
@@ -463,6 +488,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                                     // good, we're returning, for the moment, we do not care about the performance of this path
                                     // and just stop here
                                     currentIs = null;
+                                    currentBlock = null;
                                 } else {
                                    throw new AssertionError("We don't know which branch to take..." + b);
                                 }
@@ -473,25 +499,31 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         BasicBlock<?> target = jump.destination().getTargetBlock();
                         var targetInstructions = lir.getLIRforBlock(target);
                         currentIs = targetInstructions;
+                        currentBlock = target;
                     }
                     case AArch64ControlFlow.RangeTableSwitchOp r -> {
                         // we reached the end of the dispatch blocks
                         currentIs = null;
+                        currentBlock = null;
                     }
                     case AMD64ControlFlow.RangeTableSwitchOp r -> {
                         // we reached the end of the dispatch blocks
                         currentIs = null;
+                        currentBlock = null;
                     }
                     case AArch64HotSpotSafepointOp s -> {
-                        recordResult(details, s.getScratchValue());
-                        recordInput(details, s.getThreadRegister());
+                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        recordResult(details, s.getScratchValue(), instRef);
+                        recordInput(details, s.getThreadRegister(), instRef);
                     }
                     case AMD64HotSpotSafepointOp s -> {
-                        recordResult(details, s.getScratchValue());
-                        recordInput(details, s.getThreadRegister());
+                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        recordResult(details, s.getScratchValue(), instRef);
+                        recordInput(details, s.getThreadRegister(), instRef);
                     }
-                    case LIRInstruction i -> {
-                        recordAllInputsAndOutputs(details, i);
+                    case LIRInstruction instruction -> {
+                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        recordAllInputsAndOutputs(details, instruction, instRef);
                     }
                     // default -> throw new AssertionError("Not yet supported instruction: " + ins);
                 }
@@ -532,7 +564,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
      * @param lir
      * @param dispatchInputs
      */
-    private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Set<Register> dispatchInputs, HashMap<Register, InstRef> liveSet, int originBlockId) {
+    private static void determineRegisterUsage(PhaseState state, BasicBlock<?> block, LIR lir, Map<Register, List<InstRef>> dispatchInputs, HashMap<Register, InstRef> liveSet, int originBlockId) {
         var instructions = lir.getLIRforBlock(block);
         final var details = getDetailsAndInitializeIfNecessary(block, instructions);
 
@@ -593,7 +625,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 BasicBlock<?> target = b.destination().getTargetBlock();
                 if (target.getId() == state.dispatchBlock.getId()) {
                     // mark all registers that are used in the dispatch blocks as used by instruction -1
-                    for (Register reg : dispatchInputs) {
+                    for (Register reg : dispatchInputs.keySet()) {
                         if (liveSet.get(reg) != null && liveSet.get(reg).blockId == block.getId()) {
                             int instIdx = liveSet.get(reg).instIdx;
                             if (details.instUsage[instIdx] == null) {
