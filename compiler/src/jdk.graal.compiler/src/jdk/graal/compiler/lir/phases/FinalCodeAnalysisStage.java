@@ -33,7 +33,7 @@ public class FinalCodeAnalysisStage extends LIRPhaseSuite<FinalCodeAnalysisConte
 
     @SuppressWarnings("this-escape")
     public FinalCodeAnalysisStage(@SuppressWarnings("unused") OptionValues options) {
-        appendPhase(new PushMovesToUsagePhase());
+//        appendPhase(new PushMovesToUsagePhase());
         appendPhase(new LocationMarkerPhase());
     }
 }
