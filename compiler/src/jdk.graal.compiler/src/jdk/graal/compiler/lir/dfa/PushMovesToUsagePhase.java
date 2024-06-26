@@ -32,6 +32,7 @@ import jdk.vm.ci.meta.Value;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -231,6 +232,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static class PhaseState {
         public BasicBlock<?> dispatchBlock;
         public BasicBlock<?> lastDispatchBlock;
+        public final Set<Integer> blocksWithDeletedInstructions = new HashSet<>();
 
         public final List<BasicBlock<?>> bytecodeHandlers = new ArrayList<>();
     }
@@ -725,8 +727,19 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     }
 
     private static void findTooEagerRegisterSpills(PhaseState state, LIR lir) {
+        List<InstRef> unnecessarySpillOperations = new ArrayList<>();
         for (BasicBlock<?> bytecodeHandlerStart : state.bytecodeHandlers) {
-            findTooEagerRegisterSpills(state, bytecodeHandlerStart, lir);
+            findTooEagerRegisterSpills(state, bytecodeHandlerStart, lir, unnecessarySpillOperations);
+        }
+
+        int i = 0;
+        if (!unnecessarySpillOperations.isEmpty()) {
+            System.out.println("Removing unnecessary Spill Operations: ");
+            for (InstRef instRef : unnecessarySpillOperations) {
+                i += 1;
+                System.out.println("  " + instRef);
+                deleteInstruction(state, lir, instRef);
+            }
         }
     }
 
@@ -752,12 +765,19 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return lir.getLIRforBlock(lir.getBlockById(instRef.blockId)).get(instRef.instIdx);
     }
 
-    private static void deleteInstruction(LIR lir, InstRef instRef) {
-        var instructions = lir.getLIRforBlock(lir.getBlockById(instRef.blockId));
+    private static void deleteInstruction(PhaseState state, LIR lir, InstRef instRef) {
+        int blockId = instRef.blockId;
+        if (state.blocksWithDeletedInstructions.contains(blockId)) {
+            System.out.println("==   blockId already modified: " + blockId + ". Instruction not deleted: " + instRef.instIdx);
+            return;
+        }
+        state.blocksWithDeletedInstructions.add(blockId);
+
+        var instructions = lir.getLIRforBlock(lir.getBlockById(blockId));
         instructions.remove(instRef.instIdx);
     }
 
-    private static void findTooEagerRegisterSpills(PhaseState state, BasicBlock<?> start, LIR lir) {
+    private static void findTooEagerRegisterSpills(PhaseState state, BasicBlock<?> start, LIR lir, List<InstRef> unnecessarySpillOperations) {
         var details = getDetails(lir.getLIRforBlock(start));
         assert details != null : "Details not found for block: " + start;
 
@@ -766,8 +786,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         List<Entry<StackSlot, List<InstRef>>> candidates = doneOnce(state, details.writtenToMemory.entrySet());
 
         List<Entry<StackSlot, List<InstRef>>> remainingCandidates = new ArrayList<>();
-
-        List<InstRef> unnecesarySpillOperations = new ArrayList<>();
 
         for (var slotAccesses : candidates) {
             // find the candidates that are then read back again
@@ -819,19 +837,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         var o2 = move2.getResult();
 
                         if (isStackSlot(i2) && isRegister(o2) && asStackSlot(i2).equals(slot) && asRegister(o2).equals(reg)) {
-                            unnecesarySpillOperations.add(instRef);
-                            unnecesarySpillOperations.add(allWrites.getFirst());
+                            unnecessarySpillOperations.add(instRef);
+                            unnecessarySpillOperations.add(allWrites.getFirst());
                         }
                     }
                 }
-            }
-        }
-
-        if (!unnecesarySpillOperations.isEmpty()) {
-            System.out.println("Removing unnecessary Spill Operations: ");
-            for (InstRef instRef : unnecesarySpillOperations) {
-                System.out.println("  " + instRef);
-                deleteInstruction(lir, instRef);
             }
         }
     }
@@ -962,10 +972,16 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     // so, let's ignore them
                     // and just deal with plain moves
                     if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
+                        if (state.blocksWithDeletedInstructions.contains(blockId)) {
+                            System.out.println("==   blockId already modified: " + blockId + ". Instruction not deleted: " + i);
+                            continue;
+                        }
+
                         System.out.println("== Remove: " + instructions.get(i));
                         System.out.println("==   in blockId: " + blockId + " at idx: " + i);
                         instructions.remove(i);
 
+                        state.blocksWithDeletedInstructions.add(blockId);
                         numRemoved += 1;
 
                         // stop after the first
