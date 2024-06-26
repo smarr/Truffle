@@ -30,6 +30,7 @@ import java.util.Objects;
 import jdk.graal.compiler.lir.InstructionValueConsumer;
 import jdk.graal.compiler.lir.InstructionValueProcedure;
 import jdk.graal.compiler.lir.LIRInstruction;
+import jdk.vm.ci.code.ValueUtil;
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.collections.MapCursor;
 import jdk.graal.compiler.debug.GraalError;
@@ -374,9 +375,18 @@ public final class IndexedValueMap {
             return v1;
         } else if (v1.equals(v2)) {
             return v1;
-        } else {
-            throw GraalError.shouldNotReachHere("unable to merge %s and %s".formatted(v1, v2));
+        } else if (ValueUtil.isRegister(v1) && ValueUtil.isRegister(v2)) {
+            var r1 = ValueUtil.asRegister(v1);
+            var r2 = ValueUtil.asRegister(v2);
+            if (r1.number == r2.number) {
+                if (v1.getValueKind().getPlatformKind().getSizeInBytes() < v2.getValueKind().getPlatformKind().getSizeInBytes()) {
+                    return v1;
+                } else {
+                    return v2;
+                }
+            }
         }
+        throw GraalError.shouldNotReachHere("unable to merge %s and %s".formatted(v1, v2));
     }
 
     /**

@@ -135,7 +135,16 @@ final class RegStackValueSet extends ValueSet<RegStackValueSet> {
         if (v1 == null || v2 == null || v1.equals(v2)) {
             return;
         }
-        if (!LIRValueUtil.uncast(v1).equals(LIRValueUtil.uncast(v2))) {
+        var v1Val = LIRValueUtil.uncast(v1);
+        var v2Val = LIRValueUtil.uncast(v2);
+        if (!v1Val.equals(v2Val)) {
+            if (isRegister(v1Val) && isRegister(v2Val)) {
+                var r1 = asRegister(v1Val);
+                var r2 = asRegister(v2Val);
+                if (r1 == r2) {
+                    return;
+                }
+            }
             throw new GraalError("mismatched definition: %s != %s", v1, v2);
         }
     }
