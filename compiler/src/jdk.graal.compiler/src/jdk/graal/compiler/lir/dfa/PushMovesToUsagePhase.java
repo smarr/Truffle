@@ -739,7 +739,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             System.out.println("Removing unnecessary Spill Operations: ");
             for (InstRef instRef : unnecessarySpillOperations) {
                 i += 1;
-                System.out.println("  " + instRef);
                 deleteInstruction(state, lir, instRef);
             }
         }
@@ -780,6 +779,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             throw new AssertionError("Instruction mismatch at " + blockId + ":" + instRef.instIdx + " " + instRef.instruction + " was: " + instructions.get(instRef.instIdx));
         }
 
+        System.out.println("  - remove instruction: " + blockId + ":" + instRef.instIdx);
         instructions.remove(instRef.instIdx);
     }
 
@@ -913,16 +913,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // 6. find bytecode handlers that spill register, but only use it on slow path
         findTooEagerRegisterSpills(state, lir);
 
-        // show unused registers at the top of the bytecode handlers
-        for (BasicBlock<?> bytecodeHandlerBlock : state.bytecodeHandlers) {
-            unusedMove(bytecodeHandlerBlock, lir);
-        }
-
         removeUnusedMoves(state, lir);
     }
 
     private static void removeUnusedMoves(PhaseState state, LIR lir) {
-        int numberOfCandidates = 0;
+        List<InstRef> candidates = new ArrayList<>();
 
         // first count
         for (int blockId : lir.codeEmittingOrder()) {
@@ -947,73 +942,18 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     // so, let's ignore them
                     // and just deal with plain moves
                     if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
-                        numberOfCandidates += 1;
+                        candidates.add(new InstRef(blockId, i, instructions.get(i)));
                     }
                 }
             }
         }
 
-        System.out.println("Candidates for Removal: " + numberOfCandidates);
-
-        int numRemoved = 0;
-        for (int blockId : lir.codeEmittingOrder()) {
-            if (LIR.isBlockDeleted(blockId)) {
-                continue;
-            }
-
-            BasicBlock<?> block = lir.getBlockById(blockId);
-            var details = getDetails(lir.getLIRforBlock(block));
-
-            if (details == null || details.instUsage == null) {
-                continue;
-            }
-
-            ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
-
-            // we skip the label and the jump/return/deopt/deadend at the end
-            // we go backwards to not mess up the indexes for earlier instructions when removing things
-            for (int i = instructions.size() - 1; i > 0; i -= 1) {
-                if (instructions.get(i) instanceof StandardOp.MoveOp move && details.instUsage[i] == null && isRegister(move.getResult())) {
-                    // I don't really understand what these references are yet.
-                    // so, let's ignore them
-                    // and just deal with plain moves
-                    if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
-                        if (state.blocksWithDeletedInstructions.contains(blockId)) {
-                            System.out.println("==   blockId already modified: " + blockId + ". Instruction not deleted: " + i);
-                            continue;
-                        }
-
-                        System.out.println("== Remove: " + instructions.get(i));
-                        System.out.println("==   in blockId: " + blockId + " at idx: " + i);
-                        instructions.remove(i);
-
-                        state.blocksWithDeletedInstructions.add(blockId);
-                        numRemoved += 1;
-
-                        // stop after the first
-                        // return;
-                    }
-                }
-            }
+        System.out.println("Removing unused moves, candidates: " + candidates.size());
+        for (InstRef instRef : candidates) {
+            deleteInstruction(state, lir, instRef);
         }
     }
 
-    private static List<Integer> unusedMove(BasicBlock<?> block, LIR lir) {
-        ArrayList<LIRInstruction> insts = lir.getLIRforBlock(block);
-        ArrayList<Integer> unusedMoves = new ArrayList<>();
-
-        for (int i = 0; i < insts.size(); i += 1) {
-            if (insts.get(i) instanceof StandardOp.MoveOp move) {
-                var details = PushMovesToUsagePhase.getDetails(insts);
-                if (details.instUsage[i] == null) {
-                    unusedMoves.add(i);
-                    System.out.println("Unused move at block " + block.getId() + ":" + i);
-                }
-            }
-        }
-
-        return unusedMoves;
-    }
 
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
