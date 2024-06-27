@@ -444,7 +444,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
     private static void recordResult(BasicBlockBytecodeDetails details, Value result, InstRef instRef) {
         if (isRegister(result)) {
-            addToList(details.writtenToRegisters, asRegister(result), instRef);
+            if (usesRegisterAsReference(result)) {
+                // this isn't a write to the register, but a read from it
+                // and then a write to a memory address, though, it's not a stack slot
+                recordInput(details, result, instRef);
+            } else {
+                addToList(details.writtenToRegisters, asRegister(result), instRef);
+            }
         } else if (isStackSlot(result)) {
             addToList(details.writtenToMemory, asStackSlot(result), instRef);
         } else if (isIllegal(result) || result instanceof ConstantValue) {
@@ -623,7 +629,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
-                    liveSet.put(reg, inst);
+                    if (usesRegisterAsReference(value)) {
+                        recordUse(liveSet.get(reg), lir, inst);
+                    } else {
+                        liveSet.put(reg, inst);
+                    }
                 }
                 return value;
             });
@@ -941,7 +951,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                     // I don't really understand what these references are yet.
                     // so, let's ignore them
                     // and just deal with plain moves
-                    if (!move.getResult().getValueKind(LIRKind.class).isReference(0)) {
+                    if (!usesRegisterAsReference(move.getResult())) {
                         candidates.add(new InstRef(blockId, i, instructions.get(i)));
                     }
                 }
@@ -954,6 +964,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         }
     }
 
+    public static boolean usesRegisterAsReference(Value value) {
+        var kind = value.getValueKind(LIRKind.class);
+        boolean isReference = kind.getReferenceCount() > 0;
+        assert isReference ^ kind.isValue();
+        return isReference;
+    }
 
 //            // Hard code this for now
 //            switch (label.getBytecodeHandlerIndex()) {
