@@ -20,7 +20,6 @@ import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
 import jdk.graal.compiler.lir.StandardOp.ValueMoveOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
-import jdk.graal.compiler.lir.aarch64.AArch64Move.Move;
 import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
@@ -109,13 +108,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         public Map<Register, List<InstRef>> allRegisterReads;
 
-        /** Memory locations that are written to, incl. instructions. */
-        public Map<StackSlot, List<InstRef>> writtenToMemory;
+        /** Stack locations that are written to, incl. instructions. */
+        public Map<StackSlot, List<InstRef>> writtenToStack;
 
-        /** Memory locations that are read from, without having been written to first. */
-        public Map<StackSlot, List<InstRef>> readFromMemory;
+        /** Stack locations that are read from, without having been written to first. */
+        public Map<StackSlot, List<InstRef>> readFromStack;
 
-        public Map<StackSlot, List<InstRef>> allMemoryReads;
+        public Map<StackSlot, List<InstRef>> allStackReads;
 
 
         public List<InstRef>[] instUsage;
@@ -147,9 +146,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             writtenToRegisters = new HashMap<>();
             readFromRegisters = new HashMap<>();
             allRegisterReads = new HashMap<>();
-            writtenToMemory = new HashMap<>();
-            readFromMemory = new HashMap<>();
-            allMemoryReads = new HashMap<>();
+            writtenToStack = new HashMap<>();
+            readFromStack = new HashMap<>();
+            allStackReads = new HashMap<>();
             instUsage = new List[numberOfInstructions];
         }
 
@@ -218,11 +217,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             if (desc != null) {
                 start += ",rr" + desc;
             }
-            desc = stackMapToString(writtenToMemory);
+            desc = stackMapToString(writtenToStack);
             if (desc != null) {
                 start += ",wm" + desc;
             }
-            desc = stackMapToString(readFromMemory);
+            desc = stackMapToString(readFromStack);
             if (desc != null) {
                 start += ",rm" + desc;
             }
@@ -430,11 +429,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             addToList(details.allRegisterReads, inputReg, instRef);
         } else if (isStackSlot(input)) {
             StackSlot inputSlot = asStackSlot(input);
-            if (!details.writtenToMemory.containsKey(inputSlot)) {
-                addToList(details.readFromMemory, inputSlot, instRef);
+            if (!details.writtenToStack.containsKey(inputSlot)) {
+                addToList(details.readFromStack, inputSlot, instRef);
             }
 
-            addToList(details.allMemoryReads, inputSlot, instRef);
+            addToList(details.allStackReads, inputSlot, instRef);
         } else if (isIllegal(input) || input instanceof ConstantValue) {
             // ignore
         } else {
@@ -452,7 +451,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 addToList(details.writtenToRegisters, asRegister(result), instRef);
             }
         } else if (isStackSlot(result)) {
-            addToList(details.writtenToMemory, asStackSlot(result), instRef);
+            addToList(details.writtenToStack, asStackSlot(result), instRef);
         } else if (isIllegal(result) || result instanceof ConstantValue) {
             // I did get IllegalValue for a direct call to SubstrateArraycopySnippets.doArraycopy
             // it's a bit odd, but fine, I'll ignore it for now
@@ -797,15 +796,15 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         var details = getDetails(lir.getLIRforBlock(start));
         assert details != null : "Details not found for block: " + start;
 
-        // find all the memory locations that written to once, in the bytecode handler
+        // find all the stack locations that written to once, in the bytecode handler
         // these might be register spills
-        List<Entry<StackSlot, List<InstRef>>> candidates = doneOnce(state, details.writtenToMemory.entrySet());
+        List<Entry<StackSlot, List<InstRef>>> candidates = doneOnce(state, details.writtenToStack.entrySet());
 
         List<Entry<StackSlot, List<InstRef>>> remainingCandidates = new ArrayList<>();
 
         for (var slotAccesses : candidates) {
             // find the candidates that are then read back again
-            if (details.allMemoryReads.containsKey(slotAccesses.getKey())) {
+            if (details.allStackReads.containsKey(slotAccesses.getKey())) {
                 remainingCandidates.add(slotAccesses);
             }
         }
