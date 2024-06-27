@@ -48,10 +48,12 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     public static final class InstRef {
         public final int blockId;
         public final int instIdx;
+        public final LIRInstruction instruction;
 
-        public InstRef(int blockId, int instId) {
+        public InstRef(int blockId, int instId, LIRInstruction instruction) {
             this.blockId = blockId;
             this.instIdx = instId;
+            this.instruction = instruction;
         }
 
         @Override
@@ -533,17 +535,17 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                         currentBlock = null;
                     }
                     case AArch64HotSpotSafepointOp s -> {
-                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        InstRef instRef = new InstRef(currentBlock.getId(), i, s);
                         recordResult(details, s.getScratchValue(), instRef);
                         recordInput(details, s.getThreadRegister(), instRef);
                     }
                     case AMD64HotSpotSafepointOp s -> {
-                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        InstRef instRef = new InstRef(currentBlock.getId(), i, s);
                         recordResult(details, s.getScratchValue(), instRef);
                         recordInput(details, s.getThreadRegister(), instRef);
                     }
                     case LIRInstruction instruction -> {
-                        InstRef instRef = new InstRef(currentBlock.getId(), i);
+                        InstRef instRef = new InstRef(currentBlock.getId(), i, instruction);
                         recordAllInputsAndOutputs(details, instruction, instRef);
                     }
                     // default -> throw new AssertionError("Not yet supported instruction: " + ins);
@@ -607,8 +609,8 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         //   of the instruction that wrote to the register
         // - if the instruction writes to a register, we update the live set
         for (int i = 1; i < instructions.size(); i += 1) {
-            InstRef inst = new InstRef(block.getId(), i);
             LIRInstruction ins = instructions.get(i);
+            InstRef inst = new InstRef(block.getId(), i, ins);
 
             ins.forEachInput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
@@ -652,7 +654,7 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                             if (details.instUsage[instIdx] == null) {
                                 details.instUsage[instIdx] = new ArrayList<>();
                             }
-                            details.instUsage[instIdx].add(new InstRef(-1, -1));
+                            details.instUsage[instIdx].add(new InstRef(-1, -1, null));
                         }
                     }
                     return;
@@ -774,6 +776,10 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         state.blocksWithDeletedInstructions.add(blockId);
 
         var instructions = lir.getLIRforBlock(lir.getBlockById(blockId));
+        if (instructions.get(instRef.instIdx) != instRef.instruction) {
+            throw new AssertionError("Instruction mismatch at " + blockId + ":" + instRef.instIdx + " " + instRef.instruction + " was: " + instructions.get(instRef.instIdx));
+        }
+
         instructions.remove(instRef.instIdx);
     }
 
