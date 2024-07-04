@@ -468,6 +468,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             recordResult(details, value, instRef);
             return value;
         });
+
+        // TODO: I am not sure this is correct, but in a sense, if we need it for the debug
+        // state, then we may as well just record it as a result
+        ins.forEachState((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+            recordResult(details, value, instRef);
+            return value;
+        });
     }
 
     private static void establishInputs(PhaseState state, LIR lir, BasicBlock<?> startBlock) {
@@ -625,6 +632,20 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             });
 
             ins.forEachOutput((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
+                if (isRegister(value)) {
+                    Register reg = asRegister(value);
+                    if (usesRegisterAsReference(value)) {
+                        recordUse(liveSet.get(reg), lir, inst);
+                    } else {
+                        liveSet.put(reg, inst);
+                    }
+                }
+                return value;
+            });
+
+            // TODO: I am not sure this is correct, but in a sense, if we need it for the debug
+            // state, then we may as well just record it as a result
+            ins.forEachState((Value value, OperandMode mode, EnumSet<OperandFlag> flags) -> {
                 if (isRegister(value)) {
                     Register reg = asRegister(value);
                     if (usesRegisterAsReference(value)) {
