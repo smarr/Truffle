@@ -111,7 +111,9 @@ public abstract class LocationMarker<S extends ValueSet<S>> {
                 ArrayList<LIRInstruction> instructions = lir.getLIRforBlock(block);
                 for (int i = instructions.size() - 1; i >= 0; i--) {
                     LIRInstruction inst = instructions.get(i);
-                    processInstructionBottomUp(inst);
+                    if (inst != null) {
+                        processInstructionBottomUp(inst);
+                    }
                 }
                 liveInMap.put(block, currentSet);
                 currentSet = null;

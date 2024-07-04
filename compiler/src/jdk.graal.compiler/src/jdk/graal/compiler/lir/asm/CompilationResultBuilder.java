@@ -571,7 +571,9 @@ public class CompilationResultBuilder extends CoreProvidersDelegate {
             }
 
             try {
-                emitOp(op);
+                if (op != null) {
+                    emitOp(op);
+                }
             } catch (GraalError e) {
                 throw e.addContext("lir instruction", block + "@" + op.id() + " " + op.getClass().getName() + " " + op);
             }
@@ -672,8 +674,10 @@ public class CompilationResultBuilder extends CoreProvidersDelegate {
                         labelBindLirPositions.put(label, instructionPosition);
                     }
                 }
-                lirPositions.put(op, instructionPosition);
-                instructionPosition++;
+                if (op != null) {
+                    lirPositions.put(op, instructionPosition);
+                    instructionPosition++;
+                }
             }
         }
     }
