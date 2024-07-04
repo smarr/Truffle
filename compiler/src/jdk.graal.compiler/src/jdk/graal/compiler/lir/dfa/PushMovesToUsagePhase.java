@@ -489,8 +489,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         // and process all instructions to collect the inputs
         while (currentIs != null) {
             assert currentBlock != null;
+            final int numInstsInCurrentBlock = currentIs.size();
 
-            for (int i = 1 /* ignore the label*/; currentIs != null && i < currentIs.size(); i += 1) {
+            for (int i = 1 /* ignore the label*/; i < numInstsInCurrentBlock; i += 1) {
                 assert currentBlock != null;
 
                 LIRInstruction ins = currentIs.get(i);
