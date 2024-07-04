@@ -233,7 +233,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static class PhaseState {
         public BasicBlock<?> dispatchBlock;
         public BasicBlock<?> lastDispatchBlock;
-        public final Set<Integer> blocksWithDeletedInstructions = new HashSet<>();
 
         public final List<BasicBlock<?>> bytecodeHandlers = new ArrayList<>();
     }
@@ -777,19 +776,13 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
     private static void deleteInstruction(PhaseState state, LIR lir, InstRef instRef) {
         int blockId = instRef.blockId;
-        if (state.blocksWithDeletedInstructions.contains(blockId)) {
-            System.out.println("==   blockId already modified: " + blockId + ". Instruction not deleted: " + instRef.instIdx);
-            return;
-        }
-        state.blocksWithDeletedInstructions.add(blockId);
-
         var instructions = lir.getLIRforBlock(lir.getBlockById(blockId));
         if (instructions.get(instRef.instIdx) != instRef.instruction) {
             throw new AssertionError("Instruction mismatch at " + blockId + ":" + instRef.instIdx + " " + instRef.instruction + " was: " + instructions.get(instRef.instIdx));
         }
 
         System.out.println("  - remove instruction: " + blockId + ":" + instRef.instIdx);
-        instructions.remove(instRef.instIdx);
+        instructions.set(instRef.instIdx, null);
     }
 
     private static void findTooEagerRegisterSpills(PhaseState state, BasicBlock<?> start, LIR lir, List<InstRef> unnecessarySpillOperations) {
