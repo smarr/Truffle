@@ -18,6 +18,7 @@ import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopReturnOp;
 import jdk.graal.compiler.lir.StandardOp.BytecodeLoopSlowPathOp;
 import jdk.graal.compiler.lir.StandardOp.LabelOp;
+import jdk.graal.compiler.lir.StandardOp.PossibleLoadOp;
 import jdk.graal.compiler.lir.StandardOp.ValueMoveOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
 import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
@@ -915,11 +916,15 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
     private static void deleteInstruction(PhaseState state, LIR lir, InstRef instRef) {
         int blockId = instRef.blockId;
         var instructions = lir.getLIRforBlock(lir.getBlockById(blockId));
+        deleteInstruction(instRef, instructions);
+    }
+
+    private static void deleteInstruction(InstRef instRef, List<LIRInstruction> instructions) {
         if (instructions.get(instRef.instIdx) != instRef.instruction) {
-            throw new AssertionError("Instruction mismatch at " + blockId + ":" + instRef.instIdx + " " + instRef.instruction + " was: " + instructions.get(instRef.instIdx));
+            throw new AssertionError("Instruction mismatch at " + instRef.blockId + ":" + instRef.instIdx + " " + instRef.instruction + " was: " + instructions.get(instRef.instIdx));
         }
 
-        System.out.println("  - remove instruction: " + blockId + ":" + instRef.instIdx);
+        System.out.println("  - remove instruction: " + instRef.blockId + ":" + instRef.instIdx);
         instructions.set(instRef.instIdx, null);
     }
 
@@ -1057,11 +1062,6 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         // find instructions that are not used in the same block
         findTooEagerInstructions(state, lir);
-
-        // Pattern:
-        // load from stack intro register
-        // register is only read by reg to reg move
-        // -> replace reg-to-reg move with load into that reg
     }
 
     private static void removeUnusedMoves(PhaseState state, LIR lir) {
@@ -1153,13 +1153,19 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         optimizeLoadRegRegMove(state, lir, usedOnlyLater);
     }
 
+    /**
+     * Pattern:
+     *  - load from stack into register
+     *  - register is only read by reg to reg move
+     *  - replace reg-to-reg move with load into that reg
+     */
     private static void optimizeLoadRegRegMove(PhaseState state, LIR lir, LinkedHashSet<InstRef> usedOnlyLater) {
-        for (InstRef candidate : usedOnlyLater) {
-            if (!(candidate.instruction instanceof AMD64Move.MoveToRegOp)) {
+        for (InstRef candidate : new ArrayList<>(usedOnlyLater)) {
+            if (!(candidate.instruction instanceof PossibleLoadOp)) {
                 continue;
             }
 
-            AMD64Move.MoveToRegOp candidateInst = (AMD64Move.MoveToRegOp) candidate.instruction;
+            PossibleLoadOp candidateInst = (PossibleLoadOp) candidate.instruction;
 
             BasicBlock<?> block = lir.getBlockById(candidate.blockId);
             List<LIRInstruction> instructions = lir.getLIRforBlock(block);
@@ -1185,20 +1191,26 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
             BasicBlock<?> useBlock = lir.getBlockById(use.blockId);
             List<LIRInstruction> useInstructions = lir.getLIRforBlock(useBlock);
 
-            if (useInstructions.get(use.instIdx) != use.instruction || !(use.instruction instanceof AMD64Move.MoveToRegOp)) {
+            if (useInstructions.get(use.instIdx) != use.instruction || !(use.instruction instanceof PossibleLoadOp)) {
                 continue;
             }
 
-            AMD64Move.MoveToRegOp move = (AMD64Move.MoveToRegOp) use.instruction;
-            if (!isRegister(move.getResult())) {
+            PossibleLoadOp move = (PossibleLoadOp) use.instruction;
+            if (!move.resultIsRegister()) {
                 continue;
             }
 
             assert move.getInput() == candidateInst.getResult();
 
             System.out.println(" - update " + use + " and remove " + candidate);
-            move.replaceInputFrom(candidateInst);
-            instructions.set(candidate.instIdx, null);
+            if (move.canBeLoad()) {
+                move.replaceInputFrom(candidateInst);
+            } else {
+                throw new AssertionError("Not yet handled");
+            }
+            deleteInstruction(candidate, instructions);
+
+            usedOnlyLater.remove(candidate);
         }
     }
 

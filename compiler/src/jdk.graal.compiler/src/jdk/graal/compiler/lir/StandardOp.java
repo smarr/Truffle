@@ -27,6 +27,7 @@ package jdk.graal.compiler.lir;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import jdk.vm.ci.code.ValueUtil;
 import org.graalvm.collections.EconomicSet;
 import org.graalvm.collections.Equivalence;
 
@@ -255,6 +256,20 @@ public class StandardOp {
     public interface BranchOp extends BlockEndOp {
         public LabelRef getTrueDestination();
         public LabelRef getFalseDestination();
+    }
+
+    /** Marker interface for instruction that possibly read from mem and write to register. */
+    public interface PossibleLoadOp {
+        AllocatableValue getResult();
+        AllocatableValue getInput();
+
+        default boolean resultIsRegister() {
+            return ValueUtil.isRegister(getResult());
+        }
+
+        boolean canBeLoad();
+
+        void replaceInputFrom(PossibleLoadOp input);
     }
 
     /**

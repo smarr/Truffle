@@ -49,6 +49,7 @@ import jdk.graal.compiler.lir.LIRInstructionClass;
 import jdk.graal.compiler.lir.LIRValueUtil;
 import jdk.graal.compiler.lir.Opcode;
 import jdk.graal.compiler.lir.StandardOp;
+import jdk.graal.compiler.lir.StandardOp.PossibleLoadOp;
 import jdk.graal.compiler.lir.VirtualStackSlot;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
 import jdk.vm.ci.amd64.AMD64;
@@ -80,7 +81,7 @@ public class AMD64Move {
     }
 
     @Opcode("MOVE")
-    public static final class MoveToRegOp extends AbstractMoveOp {
+    public static final class MoveToRegOp extends AbstractMoveOp implements StandardOp.PossibleLoadOp {
         public static final LIRInstructionClass<MoveToRegOp> TYPE = LIRInstructionClass.create(MoveToRegOp.class);
 
         @Def({OperandFlag.REG, OperandFlag.STACK, OperandFlag.HINT}) protected AllocatableValue result;
@@ -93,6 +94,9 @@ public class AMD64Move {
         }
 
         @Override
+        public boolean canBeLoad() { return true; }
+
+        @Override
         public AllocatableValue getInput() {
             return input;
         }
@@ -102,8 +106,9 @@ public class AMD64Move {
             return result;
         }
 
-        public void replaceInputFrom(MoveToRegOp move) {
-            input = move.input;
+        @Override
+        public void replaceInputFrom(PossibleLoadOp input) {
+            this.input = input.getInput();
         }
     }
 

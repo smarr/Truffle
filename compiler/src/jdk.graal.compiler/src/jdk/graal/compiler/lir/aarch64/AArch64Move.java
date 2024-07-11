@@ -62,6 +62,7 @@ import jdk.graal.compiler.lir.Opcode;
 import jdk.graal.compiler.lir.StandardOp;
 import jdk.graal.compiler.lir.StandardOp.LoadConstantOp;
 import jdk.graal.compiler.lir.StandardOp.NullCheck;
+import jdk.graal.compiler.lir.StandardOp.PossibleLoadOp;
 import jdk.graal.compiler.lir.StandardOp.ValueMoveOp;
 import jdk.graal.compiler.lir.VirtualStackSlot;
 import jdk.graal.compiler.lir.asm.CompilationResultBuilder;
@@ -69,6 +70,7 @@ import jdk.vm.ci.aarch64.AArch64Kind;
 import jdk.vm.ci.code.MemoryBarriers;
 import jdk.vm.ci.code.Register;
 import jdk.vm.ci.code.StackSlot;
+import jdk.vm.ci.code.ValueUtil;
 import jdk.vm.ci.meta.AllocatableValue;
 import jdk.vm.ci.meta.Constant;
 import jdk.vm.ci.meta.JavaConstant;
@@ -111,7 +113,7 @@ public class AArch64Move {
     }
 
     @Opcode("MOVE")
-    public static class Move extends AArch64LIRInstruction implements ValueMoveOp {
+    public static class Move extends AArch64LIRInstruction implements ValueMoveOp, PossibleLoadOp {
         public static final LIRInstructionClass<Move> TYPE = LIRInstructionClass.create(Move.class);
 
         @Def({REG, STACK, HINT}) protected AllocatableValue result;
@@ -129,6 +131,14 @@ public class AArch64Move {
             assert resultSize == moveKind.getSizeInBytes() : Assertions.errorMessageContext("resultSize", resultSize, "moveKind", moveKind);
             assert resultSize <= inputSize : Assertions.errorMessageContext("resultSize", resultSize, "inputSize", inputSize);
             assert !(isStackSlot(result) && isStackSlot(input));
+        }
+
+        @Override
+        public boolean canBeLoad() { return true; }
+
+        @Override
+        public void replaceInputFrom(PossibleLoadOp input) {
+            this.input = input.getInput();
         }
 
         @Override
@@ -322,12 +332,30 @@ public class AArch64Move {
         }
     }
 
-    public static final class LoadOp extends ExtendableLoadOp {
+    public static final class LoadOp extends ExtendableLoadOp implements StandardOp.PossibleLoadOp {
         public static final LIRInstructionClass<LoadOp> TYPE = LIRInstructionClass.create(LoadOp.class);
 
         public LoadOp(AArch64Kind accessKind, MemoryExtendKind extendKind, AllocatableValue result, AArch64AddressValue address, LIRFrameState state) {
             super(TYPE, accessKind, extendKind, result, address, state);
         }
+
+        @Override
+        public AllocatableValue getResult() {
+            return result;
+        }
+
+        @Override
+        public AllocatableValue getInput() {
+            return null;
+        }
+
+        @Override
+        public void replaceInputFrom(PossibleLoadOp input) {
+            throw new UnsupportedOperationException("Not yet implemented.");
+        }
+
+        @Override
+        public boolean canBeLoad() { return true; }
 
         @Override
         protected int emitMemAccess(CompilationResultBuilder crb, AArch64MacroAssembler masm) {
