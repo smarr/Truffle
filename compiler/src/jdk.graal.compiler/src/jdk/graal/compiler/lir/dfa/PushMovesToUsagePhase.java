@@ -1053,6 +1053,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         findTooEagerRegisterSpills(state, lir);
 
         removeUnusedMoves(state, lir);
+
+        // find instructions that are not used in the same block
+        findTooEagerInstructions(state, lir);
     }
 
     private static void removeUnusedMoves(PhaseState state, LIR lir) {
@@ -1090,6 +1093,55 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         System.out.println("Removing unused moves, candidates: " + candidates.size());
         for (InstRef instRef : candidates) {
             deleteInstruction(state, lir, instRef);
+        }
+    }
+
+    private static void findTooEagerInstructions(PhaseState state, LIR lir) {
+        LinkedHashSet<InstRef> usedOnlyLater = new LinkedHashSet<>();
+
+        for (int blockId : lir.codeEmittingOrder()) {
+            if (LIR.isBlockDeleted(blockId)) {
+                continue;
+            }
+
+            BasicBlock<?> block = lir.getBlockById(blockId);
+            List<LIRInstruction> instructions = lir.getLIRforBlock(block);
+            var details = getDetails(instructions);
+            if (details == null || details.instUsage == null) {
+                continue;
+            }
+
+            for (int instIdx = 1; instIdx < details.instUsage.length; instIdx += 1) {
+                var usageSet = details.instUsage[instIdx];
+                if (usageSet == null) {
+                    continue;
+                }
+                InstRef instruction = new InstRef(blockId, instIdx, instructions.get(instIdx));
+
+                boolean usedLater = false;
+                boolean usedInSameBlock = false;
+                boolean usedInDispatch = false;
+                for (InstRef usage : usageSet) {
+                    if (usage.blockId == blockId) {
+                        usedInSameBlock = true;
+                    } else if (usage.blockId == -1) {
+                        usedInDispatch = true;
+                    } else {
+                        usedLater = true;
+                    }
+                }
+
+                if (!usedInSameBlock && !usedInDispatch && usedLater) {
+                    for (InstRef usage : usageSet) {
+                        usedOnlyLater.add(instruction);
+                    }
+                }
+            }
+         }
+
+        System.out.println("Found too eager instructions: " + usedOnlyLater.size());
+        for (InstRef instRef : usedOnlyLater) {
+            System.out.println("  - " + instRef);
         }
     }
 
