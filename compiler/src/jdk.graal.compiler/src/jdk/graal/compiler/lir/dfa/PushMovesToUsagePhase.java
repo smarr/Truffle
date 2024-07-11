@@ -730,6 +730,87 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         return numberOfUpdates[0];
     }
 
+    private static final String[] PADDED_BYTECODE_NAMES = new String[] {
+            "HALT            ",
+            "DUP             ",
+
+            "PUSH_LOCAL      ",
+            "PUSH_LOCAL_0    ",
+            "PUSH_LOCAL_1    ",
+            "PUSH_LOCAL_2    ",
+
+            "PUSH_ARGUMENT   ",
+            "PUSH_SELF       ",
+            "PUSH_ARG1       ",
+            "PUSH_ARG2       ",
+
+            "PUSH_FIELD      ",
+            "PUSH_FIELD_0    ",
+            "PUSH_FIELD_1    ",
+
+            "PUSH_BLOCK      ",
+            "PUSH_BLOCK_NO_CTX",
+
+            "PUSH_CONSTANT   ",
+            "PUSH_CONSTANT_0 ",
+            "PUSH_CONSTANT_1 ",
+            "PUSH_CONSTANT_2 ",
+
+            "PUSH_0          ",
+            "PUSH_1          ",
+            "PUSH_NIL        ",
+
+            "PUSH_GLOBAL     ",
+            "POP             ",
+            "POP_LOCAL       ",
+            "POP_LOCAL_0     ",
+            "POP_LOCAL_1     ",
+            "POP_LOCAL_2     ",
+
+            "POP_ARGUMENT    ",
+
+            "POP_FIELD       ",
+            "POP_FIELD_0     ",
+            "POP_FIELD_1     ",
+
+            "SEND            ",
+            "SUPER_SEND      ",
+
+            "RETURN_LOCAL    ",
+            "RETURN_NON_LOCAL",
+
+            "RETURN_SELF     ",
+            "RETURN_FIELD_0  ",
+            "RETURN_FIELD_1  ",
+            "RETURN_FIELD_2  ",
+
+            "INC             ",
+            "DEC             ",
+
+            "INC_FIELD       ",
+            "INC_FIELD_PUSH  ",
+
+            "JUMP            ",
+            "JUMP_ON_TRUE_TOP_NIL",
+            "JUMP_ON_FALSE_TOP_NIL",
+            "JUMP_ON_TRUE_POP",
+            "JUMP_ON_FALSE_POP",
+            "JUMP_BACKWARDS  ",
+
+            "JUMP2           ",
+            "JUMP2_ON_TRUE_TOP_NIL",
+            "JUMP2_ON_FALSE_TOP_NIL",
+            "JUMP2_ON_TRUE_POP",
+            "JUMP2_ON_FALSE_POP",
+            "JUMP2_BACKWARDS ",
+
+            "Q_PUSH_GLOBAL   ",
+            "Q_SEND          ",
+            "Q_SEND_1        ",
+            "Q_SEND_2        ",
+            "Q_SEND_3        ",
+    };
+
     private static void findDispatchBlockAndBytecodeHandlers(PhaseState state, LIR lir) {
         for (int blockId : lir.codeEmittingOrder()) {
             if (LIR.isBlockDeleted(blockId)) {
@@ -760,6 +841,9 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
                 continue;
             }
             state.bytecodeHandlers.add(block);
+            System.out.print("Bytecode handler for " +
+                    PADDED_BYTECODE_NAMES[getBytecodeHandlerIndex(instructions)] + " (" + getBytecodeHandlerIndex(instructions) + "), ");
+            System.out.println("\tbasic block: " + blockId);
         }
     }
 
