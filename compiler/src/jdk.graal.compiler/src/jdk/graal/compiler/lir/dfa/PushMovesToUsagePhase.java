@@ -21,6 +21,7 @@ import jdk.graal.compiler.lir.StandardOp.LabelOp;
 import jdk.graal.compiler.lir.StandardOp.ValueMoveOp;
 import jdk.graal.compiler.lir.aarch64.AArch64ControlFlow;
 import jdk.graal.compiler.lir.amd64.AMD64ControlFlow;
+import jdk.graal.compiler.lir.amd64.AMD64Move;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.lir.phases.FinalCodeAnalysisPhase;
 import jdk.vm.ci.code.Register;
@@ -1056,6 +1057,11 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
 
         // find instructions that are not used in the same block
         findTooEagerInstructions(state, lir);
+
+        // Pattern:
+        // load from stack intro register
+        // register is only read by reg to reg move
+        // -> replace reg-to-reg move with load into that reg
     }
 
     private static void removeUnusedMoves(PhaseState state, LIR lir) {
@@ -1142,6 +1148,57 @@ public final class PushMovesToUsagePhase extends FinalCodeAnalysisPhase {
         System.out.println("Found too eager instructions: " + usedOnlyLater.size());
         for (InstRef instRef : usedOnlyLater) {
             System.out.println("  - " + instRef);
+        }
+
+        optimizeLoadRegRegMove(state, lir, usedOnlyLater);
+    }
+
+    private static void optimizeLoadRegRegMove(PhaseState state, LIR lir, LinkedHashSet<InstRef> usedOnlyLater) {
+        for (InstRef candidate : usedOnlyLater) {
+            if (!(candidate.instruction instanceof AMD64Move.MoveToRegOp)) {
+                continue;
+            }
+
+            AMD64Move.MoveToRegOp candidateInst = (AMD64Move.MoveToRegOp) candidate.instruction;
+
+            BasicBlock<?> block = lir.getBlockById(candidate.blockId);
+            List<LIRInstruction> instructions = lir.getLIRforBlock(block);
+
+            if (candidate.instruction != instructions.get(candidate.instIdx)) {
+                continue;
+            }
+
+            var details = getDetails(instructions);
+
+            // only handle the simple case that there's exactly one use
+            if (details.instUsage[candidate.instIdx].size() != 1) {
+                continue;
+            }
+
+            InstRef use = details.instUsage[candidate.instIdx].getFirst();
+
+            // ignore the dispatch blocks using things...
+            if (use.blockId == -1) {
+                continue;
+            }
+
+            BasicBlock<?> useBlock = lir.getBlockById(use.blockId);
+            List<LIRInstruction> useInstructions = lir.getLIRforBlock(useBlock);
+
+            if (useInstructions.get(use.instIdx) != use.instruction || !(use.instruction instanceof AMD64Move.MoveToRegOp)) {
+                continue;
+            }
+
+            AMD64Move.MoveToRegOp move = (AMD64Move.MoveToRegOp) use.instruction;
+            if (!isRegister(move.getResult())) {
+                continue;
+            }
+
+            assert move.getInput() == candidateInst.getResult();
+
+            System.out.println(" - update " + use + " and remove " + candidate);
+            move.replaceInputFrom(candidateInst);
+            instructions.set(candidate.instIdx, null);
         }
     }
 

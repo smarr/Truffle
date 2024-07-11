@@ -101,6 +101,10 @@ public class AMD64Move {
         public AllocatableValue getResult() {
             return result;
         }
+
+        public void replaceInputFrom(MoveToRegOp move) {
+            input = move.input;
+        }
     }
 
     @Opcode("MOVE")
