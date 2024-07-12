@@ -175,7 +175,7 @@ final class PanamaNFIBackend implements NFIBackend {
     @ExportMessage
     Object createSignatureBuilder(
                     @CachedLibrary("this") NFIBackendLibrary self,
-                    @Bind("$node") Node node,
+                    @Bind Node node,
                     @Cached InlinedBranchProfile error,
                     @Cached ArrayBuilderFactory builderFactory) {
         if (!PanamaNFIContext.get(self).env.isNativeAccessAllowed()) {
