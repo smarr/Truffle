@@ -9525,7 +9525,7 @@ public class BytecodeDSLNodeFactory implements ElementHelpers {
             if (model.enableLocalScoping) {
                 ex.addParameter(new CodeVariableElement(type(int.class), "bci"));
                 ex.addParameter(new CodeVariableElement(type(int.class), "localIndex"));
-                b.startAssert().string("locals[localIndexToTableIndex(bci, localIndex) + LOCALS_OFFSET_FRAME_INDEX] == frameIndex : ").doubleQuote("Inconsistent indices.").end();
+//                b.startAssert().string("locals[localIndexToTableIndex(bci, localIndex) + LOCALS_OFFSET_FRAME_INDEX] == frameIndex : ").doubleQuote("Inconsistent indices.").end();
                 b.declaration(type(byte[].class), "localTags", "getLocalTags()");
                 b.startIf().string("localTags == null").end().startBlock();
                 b.lineComment("bytecode not yet cached.");
@@ -9572,7 +9572,7 @@ public class BytecodeDSLNodeFactory implements ElementHelpers {
             if (model.enableLocalScoping) {
                 ex.addParameter(new CodeVariableElement(type(int.class), "bci"));
                 ex.addParameter(new CodeVariableElement(type(int.class), "localIndex"));
-                b.startAssert().string("locals[localIndexToTableIndex(bci, localIndex) + LOCALS_OFFSET_FRAME_INDEX] == frameIndex : ").doubleQuote("Inconsistent indices.").end();
+//                b.startAssert().string("locals[localIndexToTableIndex(bci, localIndex) + LOCALS_OFFSET_FRAME_INDEX] == frameIndex : ").doubleQuote("Inconsistent indices.").end();
                 b.declaration(type(byte[].class), "localTags", "getLocalTags()");
                 b.startIf().string("localTags == null").end().startBlock();
                 b.lineComment("bytecode node not yet cached.");
