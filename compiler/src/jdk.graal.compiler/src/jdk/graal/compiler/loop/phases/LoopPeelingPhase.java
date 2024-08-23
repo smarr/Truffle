@@ -93,7 +93,7 @@ public class LoopPeelingPhase extends LoopPhase<LoopPolicies> {
                                             (shouldPeelOnly == -1 || shouldPeelOnly == loop.loopBegin().getId())) {
                                 // try to detect my bytecode loop
                                 if (graph.isMyBytecodeLoopMethod && loop.getInductionVariables().size() == 0) {
-                                    AbstractBeginNode begin = loop.loop().getHeader().getBeginNode();
+                                    AbstractBeginNode begin = loop.loopBegin();
                                     NodeIterable<Node> sucs = begin.next().successors();
                                     if (sucs.isNotEmpty()) {
                                         Node second = sucs.iterator().next();
