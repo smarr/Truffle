@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jdk.graal.compiler.lir.alloc.trace.TraceAllocationPhase;
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.collections.EconomicSet;
 import org.graalvm.collections.Equivalence;
@@ -348,6 +349,19 @@ final class Target_jdk_graal_compiler_lir_phases_LIRPhase {
         LIRPhase.LIRPhaseStatistics result = GraalCompilerSupport.get().getLirPhaseStatistics().get(clazz);
         if (result == null) {
             throw VMError.shouldNotReachHere(String.format("Missing statistics for phase class: %s%n", clazz.getName()));
+        }
+        return result;
+    }
+}
+
+@TargetClass(value = jdk.graal.compiler.lir.alloc.trace.TraceAllocationPhase.class, onlyWith = GraalCompilerFeature.IsEnabled.class)
+final class Target_jdk_graal_compiler_lir_alloc_trace_TraceAllocationPhase {
+
+    @Substitute
+    static TraceAllocationPhase.AllocationStatistics getAllocationStatistics(Class<?> clazz) {
+        TraceAllocationPhase.AllocationStatistics result = GraalCompilerSupport.get().traceAllocationPhaseStatistics.get(clazz);
+        if (result == null) {
+            throw VMError.shouldNotReachHere("Missing statistics for phase class: " + clazz.getName() + "\n");
         }
         return result;
     }

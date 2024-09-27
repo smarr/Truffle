@@ -187,6 +187,7 @@ public class CFGPrinterObserver implements DebugDumpHandler {
                 cfgPrinter.lir = debug.contextLookup(LIR.class);
             }
             cfgPrinter.nodeLirGenerator = debug.contextLookup(NodeLIRBuilder.class);
+            cfgPrinter.livenessInfo = debug.contextLookup(GlobalLivenessInfo.class);
             cfgPrinter.res = debug.contextLookup(LIRGenerationResult.class);
             if (cfgPrinter.lir != null && cfgPrinter.lir.getControlFlowGraph() instanceof ControlFlowGraph) {
                 cfgPrinter.cfg = (ControlFlowGraph) cfgPrinter.lir.getControlFlowGraph();
@@ -227,6 +228,7 @@ public class CFGPrinterObserver implements DebugDumpHandler {
             cfgPrinter.lir = null;
             cfgPrinter.res = null;
             cfgPrinter.nodeLirGenerator = null;
+            cfgPrinter.livenessInfo = null;
             cfgPrinter.cfg = null;
             cfgPrinter.flush();
         }

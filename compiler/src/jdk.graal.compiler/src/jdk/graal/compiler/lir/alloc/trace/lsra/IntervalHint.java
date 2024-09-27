@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,28 +22,18 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.graal.compiler.lir.phases;
+package jdk.graal.compiler.lir.alloc.trace.lsra;
 
-import jdk.graal.compiler.lir.alloc.trace.TraceRegisterAllocationPhase;
-import jdk.graal.compiler.lir.stackslotalloc.SimpleStackSlotAllocator;
-import jdk.graal.compiler.lir.alloc.lsra.LinearScanPhase;
-import jdk.graal.compiler.lir.dfa.MarkBasePointersPhase;
-import jdk.graal.compiler.options.OptionValues;
+import jdk.vm.ci.meta.AllocatableValue;
 
-import static jdk.graal.compiler.core.common.GraalOptions.TraceRA;
+/**
+ * An interval that is a hint for an {@code TraceInterval interval}.
+ */
+abstract class IntervalHint {
 
-public class EconomyAllocationStage extends LIRPhaseSuite<AllocationPhase.AllocationContext> {
-    @SuppressWarnings("this-escape")
-    public EconomyAllocationStage(@SuppressWarnings("unused") OptionValues options) {
-        appendPhase(new MarkBasePointersPhase());
+    public abstract AllocatableValue location();
 
-        if (TraceRA.getValue(options)) {
-            appendPhase(new TraceRegisterAllocationPhase());
-        } else {
-            appendPhase(new LinearScanPhase());
-        }
+    public abstract int from();
 
-        // build frame map
-        appendPhase(new SimpleStackSlotAllocator());
-    }
+    public abstract String logString();
 }

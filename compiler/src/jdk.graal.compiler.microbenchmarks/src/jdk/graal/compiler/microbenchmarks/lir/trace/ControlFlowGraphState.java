@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,28 +22,36 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.graal.compiler.lir.phases;
+package org.graalvm.compiler.microbenchmarks.lir.trace;
 
-import jdk.graal.compiler.lir.alloc.trace.TraceRegisterAllocationPhase;
-import jdk.graal.compiler.lir.stackslotalloc.SimpleStackSlotAllocator;
-import jdk.graal.compiler.lir.alloc.lsra.LinearScanPhase;
-import jdk.graal.compiler.lir.dfa.MarkBasePointersPhase;
-import jdk.graal.compiler.options.OptionValues;
+import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Setup;
 
-import static jdk.graal.compiler.core.common.GraalOptions.TraceRA;
+import org.graalvm.compiler.lir.LIR;
+import org.graalvm.compiler.microbenchmarks.lir.GraalCompilerState;
+import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
 
-public class EconomyAllocationStage extends LIRPhaseSuite<AllocationPhase.AllocationContext> {
-    @SuppressWarnings("this-escape")
-    public EconomyAllocationStage(@SuppressWarnings("unused") OptionValues options) {
-        appendPhase(new MarkBasePointersPhase());
+/**
+ * State class for working with {@link ControlFlowGraph} and {@link LIR}.
+ */
+public abstract class ControlFlowGraphState extends GraalCompilerState {
 
-        if (TraceRA.getValue(options)) {
-            appendPhase(new TraceRegisterAllocationPhase());
-        } else {
-            appendPhase(new LinearScanPhase());
-        }
+    public ControlFlowGraph cfg;
 
-        // build frame map
-        appendPhase(new SimpleStackSlotAllocator());
+    @Setup(Level.Trial)
+    public void beforeBenchmark() {
+        // setup graph
+        initializeMethod();
+        prepareRequest();
+        emitFrontEnd();
+        generateLIR();
+        // compute cfg
+        this.cfg = (ControlFlowGraph) getLIR().getControlFlowGraph();
     }
+
+    @Override
+    public LIR getLIR() {
+        return super.getLIR();
+    }
+
 }

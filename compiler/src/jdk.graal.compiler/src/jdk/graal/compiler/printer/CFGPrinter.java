@@ -46,6 +46,7 @@ import jdk.graal.compiler.graph.NodeBitMap;
 import jdk.graal.compiler.graph.Position;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
+import jdk.graal.compiler.lir.alloc.trace.GlobalLivenessInfo;
 import jdk.graal.compiler.lir.debug.IntervalDumper;
 import jdk.graal.compiler.lir.debug.IntervalDumper.IntervalVisitor;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
@@ -78,6 +79,7 @@ class CFGPrinter extends CompilationPrinter {
     protected ControlFlowGraph cfg;
     protected ScheduleResult schedule;
     protected ResolvedJavaMethod method;
+    protected GlobalLivenessInfo livenessInfo;
     protected LIRGenerationResult res;
 
     /**
@@ -344,11 +346,53 @@ class CFGPrinter extends CompilationPrinter {
         begin("IR");
         out.println("LIR");
 
+        if (livenessInfo != null) {
+            int opId = lirInstructions.get(0).id();
+            printLiveVars(livenessInfo.getBlockIn(block), "in(var)", opId);
+            printLiveLoc(livenessInfo.getInLocation(block), "in(loc)", opId);
+        }
         for (int i = 0; i < lirInstructions.size(); i++) {
             LIRInstruction inst = lirInstructions.get(i);
             printLIRInstruction(inst);
         }
+        if (livenessInfo != null) {
+            int opId = lirInstructions.get(lirInstructions.size() - 1).id();
+            printLiveVars(livenessInfo.getBlockOut(block), "out(var)", opId);
+            printLiveLoc(livenessInfo.getOutLocation(block), "out(loc)", opId);
+        }
         end("IR");
+    }
+
+    private void printLiveVars(int[] live, String lbl, int opId) {
+        out.printf("nr %4d ", opId).print(COLUMN_END).print(" instruction ");
+        out.print(lbl).print(" [");
+        for (int i = 0; i < live.length; i++) {
+            if (i > 0) {
+                out.print(", ");
+            }
+            int varNum = live[i];
+            Value value = varNum >= 0 ? livenessInfo.getVariable(varNum) : Value.ILLEGAL;
+            out.print(i).print(": ").print(value.toString());
+        }
+        out.print(']');
+        out.print(COLUMN_END);
+        out.println(COLUMN_END);
+    }
+
+    private void printLiveLoc(Value[] values, String lbl, int opId) {
+        if (values != null) {
+            out.printf("nr %4d ", opId).print(COLUMN_END).print(" instruction ");
+            out.print(lbl).print(" [");
+            for (int i = 0; i < values.length; i++) {
+                if (i > 0) {
+                    out.print(", ");
+                }
+                out.print(i).print(": ").print(values[i].toString());
+            }
+            out.print(']');
+            out.print(COLUMN_END);
+            out.println(COLUMN_END);
+        }
     }
 
     private void printLIRInstruction(LIRInstruction inst) {

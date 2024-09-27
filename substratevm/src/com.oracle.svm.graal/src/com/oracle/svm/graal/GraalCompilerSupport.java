@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import jdk.graal.compiler.lir.alloc.trace.TraceAllocationPhase;
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.Platform;
@@ -62,6 +63,8 @@ public class GraalCompilerSupport {
     protected EconomicMap<Class<?>, BasePhase.BasePhaseStatistics> basePhaseStatistics;
     protected EconomicMap<Class<?>, LIRPhase.LIRPhaseStatistics> lirPhaseStatistics;
 
+    public EconomicMap<Class<?>, TraceAllocationPhase.AllocationStatistics> traceAllocationPhaseStatistics;
+
     protected final List<DebugHandlersFactory> debugHandlersFactories = new ArrayList<>();
 
     @Platforms(Platform.HOSTED_ONLY.class)
@@ -83,6 +86,7 @@ public class GraalCompilerSupport {
     public static void allocatePhaseStatisticsCache() {
         GraalCompilerSupport.get().basePhaseStatistics = ImageHeapMap.create();
         GraalCompilerSupport.get().lirPhaseStatistics = ImageHeapMap.create();
+        GraalCompilerSupport.get().traceAllocationPhaseStatistics = ImageHeapMap.create();
     }
 
     /* Invoked once for every class that is reachable in the native image. */
@@ -96,6 +100,9 @@ public class GraalCompilerSupport {
 
             } else if (LIRPhase.class.isAssignableFrom(newlyReachableClass)) {
                 registerStatistics(newlyReachableClass, GraalCompilerSupport.get().lirPhaseStatistics, new LIRPhase.LIRPhaseStatistics(newlyReachableClass), access);
+
+            } else if (TraceAllocationPhase.class.isAssignableFrom(newlyReachableClass)) {
+                registerStatistics(newlyReachableClass, GraalCompilerSupport.get().traceAllocationPhaseStatistics, new TraceAllocationPhase.AllocationStatistics(newlyReachableClass), access);
 
             }
         }

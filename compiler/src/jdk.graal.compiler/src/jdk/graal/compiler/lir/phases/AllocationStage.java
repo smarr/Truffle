@@ -26,18 +26,25 @@ package jdk.graal.compiler.lir.phases;
 
 import jdk.graal.compiler.debug.Assertions;
 import jdk.graal.compiler.lir.alloc.AllocationStageVerifier;
+import jdk.graal.compiler.lir.alloc.trace.TraceRegisterAllocationPhase;
 import jdk.graal.compiler.lir.stackslotalloc.LSStackSlotAllocator;
 import jdk.graal.compiler.lir.stackslotalloc.SimpleStackSlotAllocator;
 import jdk.graal.compiler.lir.alloc.lsra.LinearScanPhase;
 import jdk.graal.compiler.lir.dfa.MarkBasePointersPhase;
 import jdk.graal.compiler.options.OptionValues;
 
+import static jdk.graal.compiler.core.common.GraalOptions.TraceRA;
+
 public class AllocationStage extends LIRPhaseSuite<AllocationPhase.AllocationContext> {
 
     @SuppressWarnings("this-escape")
     public AllocationStage(OptionValues options) {
         appendPhase(new MarkBasePointersPhase());
-        appendPhase(new LinearScanPhase());
+        if (TraceRA.getValue(options)) {
+            appendPhase(new TraceRegisterAllocationPhase());
+        } else {
+            appendPhase(new LinearScanPhase());
+        }
 
         // build frame map
         if (LSStackSlotAllocator.Options.LIROptLSStackSlotAllocator.getValue(options)) {
