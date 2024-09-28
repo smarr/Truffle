@@ -91,7 +91,9 @@ public class TraceLSRAIntervalBuildingBench extends GraalBenchmark {
             LIRPhaseSuite<AllocationContext> allocationStage = new LIRPhaseSuite<>();
             allocationStage.appendPhase(TRACE_BUILDER_PHASE);
             allocationStage.appendPhase(LIVENESS_ANALYSIS_PHASE);
-            return new LIRSuites(ls.getPreAllocationOptimizationStage(), allocationStage, ls.getPostAllocationOptimizationStage());
+// return new LIRSuites(ls.getPreAllocationOptimizationStage(),
+// allocationStage, ls.getPostAllocationOptimizationStage());
+            return ls;
         }
 
         @Override

@@ -24,6 +24,7 @@
  */
 package jdk.graal.compiler.microbenchmarks.lir.trace;
 
+import jdk.graal.compiler.nodes.cfg.HIRBlock;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Warmup;
@@ -46,12 +47,29 @@ public class TraceBuilderBenchmark extends GraalBenchmark {
 
     @Benchmark
     public TraceBuilderResult uniDirectionalTraceBuilder(State s) {
-        return UniDirectionalTraceBuilder.computeTraces(s.getLIR().getDebug(), s.cfg.getStartBlock(), s.cfg.getBlocks(), TraceBuilderPhase.getTrivialTracePredicate(s.getLIR()));
+        return UniDirectionalTraceBuilder.computeTraces(
+                        s.getLIR().getDebug(),
+                        s.cfg.getStartBlock(),
+                        getBlockIds(s.cfg.getBlocks()),
+                        TraceBuilderPhase.getTrivialTracePredicate(s.getLIR()),
+                        s.getLIR());
     }
 
     @Benchmark
     public TraceBuilderResult biDirectionalTraceBuilder(State s) {
-        return BiDirectionalTraceBuilder.computeTraces(s.getLIR().getDebug(), s.cfg.getStartBlock(), s.cfg.getBlocks(), TraceBuilderPhase.getTrivialTracePredicate(s.getLIR()));
+        return BiDirectionalTraceBuilder.computeTraces(
+                        s.getLIR().getDebug(),
+                        s.cfg.getStartBlock(),
+                        getBlockIds(s.cfg.getBlocks()),
+                        TraceBuilderPhase.getTrivialTracePredicate(s.getLIR()),
+                        s.getLIR());
     }
 
+    private static int[] getBlockIds(HIRBlock[] blocks) {
+        int[] blockIds = new int[blocks.length];
+        for (int i = 0; i < blocks.length; i++) {
+            blockIds[i] = blocks[i].getId();
+        }
+        return blockIds;
+    }
 }
