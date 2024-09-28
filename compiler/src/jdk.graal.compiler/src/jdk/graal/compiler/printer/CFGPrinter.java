@@ -30,6 +30,7 @@ import static jdk.graal.compiler.core.match.ComplexMatchValue.INTERIOR_MATCH;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +38,17 @@ import java.util.TreeMap;
 
 import jdk.graal.compiler.bytecode.Bytecode;
 import jdk.graal.compiler.bytecode.BytecodeDisassembler;
+import jdk.graal.compiler.core.common.alloc.Trace;
+import jdk.graal.compiler.core.common.alloc.TraceBuilderResult;
 import jdk.graal.compiler.core.common.cfg.AbstractControlFlowGraph;
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.core.gen.NodeLIRBuilder;
 import jdk.graal.compiler.core.match.ComplexMatchValue;
 import jdk.graal.compiler.graph.Node;
 import jdk.graal.compiler.graph.NodeBitMap;
+import jdk.graal.compiler.graph.NodeMap;
 import jdk.graal.compiler.graph.Position;
+import jdk.graal.compiler.java.BciBlockMapping;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.LIRInstruction;
 import jdk.graal.compiler.lir.alloc.trace.GlobalLivenessInfo;
@@ -56,6 +61,7 @@ import jdk.graal.compiler.nodes.AbstractMergeNode;
 import jdk.graal.compiler.nodes.FixedNode;
 import jdk.graal.compiler.nodes.FixedWithNextNode;
 import jdk.graal.compiler.nodes.FrameState;
+import jdk.graal.compiler.nodes.PhiNode;
 import jdk.graal.compiler.nodes.StateSplit;
 import jdk.graal.compiler.nodes.StructuredGraph.ScheduleResult;
 import jdk.graal.compiler.nodes.ValueNode;
@@ -68,6 +74,7 @@ import jdk.vm.ci.code.DebugInfo;
 import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.meta.Value;
+import org.graalvm.collections.UnmodifiableMapCursor;
 
 /**
  * Utility for printing Graal IR at various compilation phases.
@@ -91,6 +98,60 @@ class CFGPrinter extends CompilationPrinter {
         super(out);
     }
 
+    /**
+     * Prints the control flow graph denoted by a given block map.
+     *
+     * @param label A label describing the compilation phase that produced the control flow graph.
+     * @param blockMap A data structure describing the blocks in a method and how they are
+     *            connected.
+     */
+    public void printCFG(String label, BciBlockMapping blockMap) {
+        begin("cfg");
+        out.print("name \"").print(label).println('"');
+        for (BciBlockMapping.BciBlock block : blockMap.getBlocks()) {
+            begin("block");
+            printBlock(block);
+            end("block");
+        }
+        end("cfg");
+    }
+
+    private void printBlock(BciBlockMapping.BciBlock block) {
+        out.print("name \"B").print(block.getStartBci()).println('"');
+        out.print("from_bci ").println(block.getStartBci());
+        out.print("to_bci ").println(block.getEndBci());
+
+        out.println("predecessors ");
+
+        out.print("successors ");
+        for (BciBlockMapping.BciBlock succ : block.getSuccessors()) {
+            if (!succ.isExceptionEntry()) {
+                out.print("\"B").print(succ.getStartBci()).print("\" ");
+            }
+        }
+        out.println();
+
+        out.print("xhandlers");
+        for (BciBlockMapping.BciBlock succ : block.getSuccessors()) {
+            if (succ.isExceptionEntry()) {
+                out.print("\"B").print(succ.getStartBci()).print("\" ");
+            }
+        }
+        out.println();
+
+        out.print("flags ");
+        if (block.isExceptionEntry()) {
+            out.print("\"ex\" ");
+        }
+        if (block.isLoopHeader()) {
+            out.print("\"plh\" ");
+        }
+        out.println();
+
+        out.print("loop_depth ").println(block.getLoops().cardinality());
+    }
+
+    private NodeMap<HIRBlock> latestScheduling;
     private NodeBitMap printedNodes;
 
     private boolean inFixedSchedule(Node node) {
@@ -121,6 +182,49 @@ class CFGPrinter extends CompilationPrinter {
         if (method != null) {
             printBytecodes(new BytecodeDisassembler(false).disassemble(method));
         }
+
+        latestScheduling = null;
+    }
+
+    private void scheduleInputs(Node node, HIRBlock nodeBlock) {
+        if (node instanceof ValuePhiNode) {
+            PhiNode phi = (PhiNode) node;
+            HIRBlock phiBlock = latestScheduling.get(phi.merge());
+            assert phiBlock != null;
+            for (HIRBlock pred : phiBlock.getPredecessors()) {
+                schedule(phi.valueAt((AbstractEndNode) pred.getEndNode()), pred);
+            }
+
+        } else {
+            for (Node input : node.inputs()) {
+                schedule(input, nodeBlock);
+            }
+        }
+    }
+
+    private void schedule(Node input, HIRBlock block) {
+        if (!inFixedSchedule(input)) {
+            HIRBlock inputBlock = block;
+            if (latestScheduling.get(input) != null) {
+                inputBlock = AbstractControlFlowGraph.commonDominatorTyped(inputBlock, latestScheduling.get(input));
+            }
+            if (inputBlock != latestScheduling.get(input)) {
+                latestScheduling.set(input, inputBlock);
+                scheduleInputs(input, inputBlock);
+            }
+        }
+    }
+
+    private void printBlock(BasicBlock<?> block, boolean printNodes) {
+        if (block == null) {
+            return;
+        }
+        printBlockProlog(block);
+        if (printNodes) {
+            assert block instanceof HIRBlock;
+            printNodes((HIRBlock) block);
+        }
+        printBlockEpilog(block);
     }
 
     private void printBlockEpilog(BasicBlock<?> block) {
@@ -178,6 +282,41 @@ class CFGPrinter extends CompilationPrinter {
         }
 
         out.print("probability ").println(Double.doubleToRawLongBits(block.getRelativeFrequency()));
+    }
+
+    private void printNodes(HIRBlock block) {
+        printedNodes = new NodeBitMap(cfg.graph);
+        begin("IR");
+        out.println("HIR");
+        out.disableIndentation();
+
+        if (block.getBeginNode() instanceof AbstractMergeNode) {
+            // Currently phi functions are not in the schedule, so print them separately here.
+            for (ValueNode phi : ((AbstractMergeNode) block.getBeginNode()).phis()) {
+                printNode(phi, false);
+            }
+        }
+
+        Node cur = block.getBeginNode();
+        while (true) { // TERMINATION ARGUMENT: suppress checkstyle
+            printNode(cur, false);
+
+            if (cur == block.getEndNode()) {
+                UnmodifiableMapCursor<Node, HIRBlock> cursor = latestScheduling.getEntries();
+                while (cursor.advance()) {
+                    if (cursor.getValue() == block && !inFixedSchedule(cursor.getKey()) && !printedNodes.isMarked(cursor.getKey())) {
+                        printNode(cursor.getKey(), true);
+                    }
+                }
+                break;
+            }
+            assert cur.successors().count() == 1;
+            cur = cur.successors().first();
+        }
+
+        out.enableIndentation();
+        end("IR");
+        printedNodes = null;
     }
 
     private void printNode(Node node, boolean unscheduled) {
@@ -550,4 +689,153 @@ class CFGPrinter extends CompilationPrinter {
 
         printBlockEpilog(block);
     }
+
+    public void printTraces(String label, TraceBuilderResult traces) {
+        begin("cfg");
+        out.print("name \"").print(label).println('"');
+
+        for (Trace trace : traces.getTraces()) {
+            printTrace(trace, traces);
+        }
+
+        end("cfg");
+    }
+
+    private void printTrace(Trace trace, TraceBuilderResult traceBuilderResult) {
+        printTraceProlog(trace, traceBuilderResult);
+        printTraceInstructions(trace, traceBuilderResult);
+        printTraceEpilog();
+    }
+
+    private void printTraceProlog(Trace trace, TraceBuilderResult traceBuilderResult) {
+        begin("block");
+
+        out.print("name \"").print(traceToString(trace)).println('"');
+        out.println("from_bci -1");
+        out.println("to_bci -1");
+
+        out.print("predecessors ");
+        for (Trace pred : getPredecessors(trace, traceBuilderResult)) {
+            out.print("\"").print(traceToString(pred)).print("\" ");
+        }
+        out.println();
+
+        out.print("successors ");
+        for (Trace succ : getSuccessors(trace, traceBuilderResult)) {
+            // if (!succ.isExceptionEntry()) {
+            out.print("\"").print(traceToString(succ)).print("\" ");
+            // }
+        }
+        out.println();
+
+        out.print("xhandlers");
+        // TODO(je) add support for exception handler
+        out.println();
+
+        out.print("flags ");
+        // TODO(je) add support for flags
+        out.println();
+        // TODO(je) add support for loop infos
+    }
+
+    private void printTraceInstructions(Trace trace, TraceBuilderResult traceBuilderResult) {
+        if (lir == null) {
+            return;
+        }
+        begin("IR");
+        out.println("LIR");
+
+        for (BasicBlock<?> block : trace.getBlocks()) {
+            ArrayList<LIRInstruction> lirInstructions = lir.getLIRforBlock(block);
+            if (lirInstructions == null) {
+                continue;
+            }
+            printBlockInstruction(block, traceBuilderResult);
+            for (int i = 0; i < lirInstructions.size(); i++) {
+                LIRInstruction inst = lirInstructions.get(i);
+                printLIRInstruction(inst);
+            }
+        }
+        end("IR");
+    }
+
+    private void printBlockInstruction(BasicBlock<?> block, TraceBuilderResult traceBuilderResult) {
+        out.print("nr ").print(block.toString()).print(COLUMN_END).print(" instruction ");
+
+        if (block.getPredecessorCount() > 0) {
+            out.print("<- ");
+            printBlockListWithTrace(Arrays.asList(block.getPredecessors()), traceBuilderResult);
+            out.print(" ");
+        }
+        if (block.getSuccessorCount() > 0) {
+            out.print("-> ");
+            printBlockListWithTrace(Arrays.asList(block.getSuccessors()), traceBuilderResult);
+        }
+
+        out.print(COLUMN_END);
+        out.println(COLUMN_END);
+    }
+
+    private void printBlockListWithTrace(List<? extends BasicBlock<?>> blocks, TraceBuilderResult traceBuilderResult) {
+        Iterator<? extends BasicBlock<?>> it = blocks.iterator();
+        printBlockWithTrace(it.next(), traceBuilderResult);
+        while (it.hasNext()) {
+            out.print(",");
+            printBlockWithTrace(it.next(), traceBuilderResult);
+        }
+    }
+
+    private void printBlockWithTrace(BasicBlock<?> block, TraceBuilderResult traceBuilderResult) {
+        out.print(block.toString());
+        out.print("[T").print(traceBuilderResult.getTraceForBlock(block).getId()).print("]");
+    }
+
+    private void printTraceEpilog() {
+        end("block");
+    }
+
+    private static boolean isLoopBackEdge(BasicBlock<?> src, BasicBlock<?> dst) {
+        return dst.isLoopHeader() && dst.getLoop().equals(src.getLoop());
+    }
+
+    private static List<Trace> getSuccessors(Trace trace, TraceBuilderResult traceBuilderResult) {
+        BitSet bs = new BitSet(traceBuilderResult.getTraces().size());
+        for (BasicBlock<?> block : trace.getBlocks()) {
+            for (BasicBlock<?> s : block.getSuccessors()) {
+                Trace otherTrace = traceBuilderResult.getTraceForBlock(s);
+                int otherTraceId = otherTrace.getId();
+                if (trace.getId() != otherTraceId || isLoopBackEdge(block, s)) {
+                    bs.set(otherTraceId);
+                }
+            }
+        }
+        List<Trace> succ = new ArrayList<>();
+        for (int i = bs.nextSetBit(0); i >= 0; i = bs.nextSetBit(i + 1)) {
+            succ.add(traceBuilderResult.getTraces().get(i));
+        }
+        return succ;
+    }
+
+    private static List<Trace> getPredecessors(Trace trace, TraceBuilderResult traceBuilderResult) {
+        BitSet bs = new BitSet(traceBuilderResult.getTraces().size());
+        for (BasicBlock<?> block : trace.getBlocks()) {
+            for (BasicBlock<?> p : block.getPredecessors()) {
+                Trace otherTrace = traceBuilderResult.getTraceForBlock(p);
+                int otherTraceId = otherTrace.getId();
+                if (trace.getId() != otherTraceId || isLoopBackEdge(p, block)) {
+                    bs.set(traceBuilderResult.getTraceForBlock(p).getId());
+                }
+            }
+        }
+        List<Trace> pred = new ArrayList<>();
+        for (int i = bs.nextSetBit(0); i >= 0; i = bs.nextSetBit(i + 1)) {
+            pred.add(traceBuilderResult.getTraces().get(i));
+        }
+        return pred;
+    }
+
+    private static String traceToString(Trace trace) {
+        return new StringBuilder("T").append(trace.getId()).toString();
+    }
+
 }

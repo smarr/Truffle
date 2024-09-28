@@ -25,6 +25,7 @@
 package jdk.graal.compiler.printer;
 
 import static jdk.graal.compiler.debug.DebugOptions.PrintBackendCFG;
+import static jdk.graal.compiler.debug.DebugOptions.PrintCFG;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -47,6 +48,8 @@ import jdk.graal.compiler.debug.DebugOptions;
 import jdk.graal.compiler.debug.GraalError;
 import jdk.graal.compiler.debug.PathUtilities;
 import jdk.graal.compiler.debug.TTY;
+import jdk.graal.compiler.graph.Graph;
+import jdk.graal.compiler.java.BciBlockMapping;
 import jdk.graal.compiler.lir.LIR;
 import jdk.graal.compiler.lir.debug.IntervalDumper;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
@@ -133,18 +136,25 @@ public class CFGPrinterObserver implements DebugDumpHandler {
         return true;
     }
 
+    private static boolean isFrontendObject(Object object) {
+        return object instanceof Graph || object instanceof BciBlockMapping;
+    }
+
     private LIR lastLIR = null;
     private IntervalDumper delayedIntervals = null;
 
     public void dumpSandboxed(DebugContext debug, Object object, boolean forced, String message) {
-        if (!shouldDump(debug, forced)) {
+        if (!shouldDump(debug, forced, object)) {
             return;
         }
         dumpSandboxed(debug, object, message);
     }
 
-    boolean shouldDump(DebugContext debug, boolean forced) {
+    boolean shouldDump(DebugContext debug, boolean forced, Object object) {
         OptionValues options = debug.getOptions();
+        if (isFrontendObject(object) && (PrintCFG.getValue(options) || forced)) {
+            return true;
+        }
         if (PrintBackendCFG.getValue(options) || forced) {
             return true;
         }
@@ -204,6 +214,20 @@ public class CFGPrinterObserver implements DebugDumpHandler {
                 }
             } else if (object instanceof ScheduleResult) {
                 cfgPrinter.printSchedule(message, (ScheduleResult) object);
+            } else if (object instanceof StructuredGraph) {
+                StructuredGraph graph = (StructuredGraph) object;
+                if (cfgPrinter.cfg == null) {
+                    ScheduleResult scheduleResult = GraalDebugHandlersFactory.tryGetSchedule(debug, graph);
+                    if (scheduleResult != null) {
+                        cfgPrinter.cfg = scheduleResult.getCFG();
+                    }
+                }
+                if (cfgPrinter.cfg != null) {
+                    if (graph.nodeIdCount() > cfgPrinter.cfg.getNodeToBlock().capacity()) {
+                        cfgPrinter.cfg = ControlFlowGraph.compute(graph, true, true, true, false);
+                    }
+                    cfgPrinter.printCFG(message, cfgPrinter.cfg.getBlocks(), true);
+                }
             } else if (object instanceof CompilationResult && codeCache != null) {
                 final CompilationResult compResult = (CompilationResult) object;
                 cfgPrinter.printMachineCode(disassemble(options, codeCache, compResult, null), message);

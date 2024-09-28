@@ -244,7 +244,7 @@ public class BinaryGraphPrinter implements
 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public void nodeProperties(GraphInfo info, Node node, Map<String, ? super Object> props) {
+    public void nodeProperties(GraphInfo info, Node node, Map<String, Object> props) {
         node.getDebugProperties((Map) props);
         assert checkNoChars(node, props);
         NodeMap<HIRBlock> nodeToBlocks = info.nodeToBlocks;
