@@ -274,7 +274,7 @@ public final class ControlFlowGraph implements AbstractControlFlowGraph<HIRBlock
      * @param computePostdominators
      */
     @SuppressWarnings("try")
-    static ControlFlowGraph compute(StructuredGraph graph, boolean modifiableBlocks, boolean connectBlocks, boolean computeFrequency, boolean computeLoops, boolean computeDominators,
+    public static ControlFlowGraph compute(StructuredGraph graph, boolean modifiableBlocks, boolean connectBlocks, boolean computeFrequency, boolean computeLoops, boolean computeDominators,
                     boolean computePostdominators) {
         try (DebugCloseable c = CFG_MEMORY.start(graph.getDebug())) {
             ControlFlowGraph cfg = lookupCached(graph, modifiableBlocks);
