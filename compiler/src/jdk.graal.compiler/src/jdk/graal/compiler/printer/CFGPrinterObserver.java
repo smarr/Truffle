@@ -225,9 +225,11 @@ public class CFGPrinterObserver implements DebugDumpHandler {
                 }
                 if (cfgPrinter.cfg != null) {
                     if (graph.nodeIdCount() > cfgPrinter.cfg.getNodeToBlock().capacity()) {
-                        cfgPrinter.cfg = ControlFlowGraph.compute(graph, true, true, true, false);
+                        cfgPrinter.cfg = ControlFlowGraph.compute(graph, true, true, true, false, true, true);
                     }
-                    cfgPrinter.printCFG(message, cfgPrinter.cfg.getBlocks(), true);
+// cfgPrinter.printCFG(message, cfgPrinter.cfg.getBlocks(), true);
+// TODO: figure this out, how to print the cfg HIRBlocks here.
+                    cfgPrinter.printCFG(message, new int[]{});
                 }
             } else if (object instanceof CompilationResult && codeCache != null) {
                 final CompilationResult compResult = (CompilationResult) object;
