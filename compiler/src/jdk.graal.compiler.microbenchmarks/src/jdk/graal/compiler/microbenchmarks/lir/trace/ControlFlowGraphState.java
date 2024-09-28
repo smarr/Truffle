@@ -22,14 +22,14 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package org.graalvm.compiler.microbenchmarks.lir.trace;
+package jdk.graal.compiler.microbenchmarks.lir.trace;
 
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 
-import org.graalvm.compiler.lir.LIR;
-import org.graalvm.compiler.microbenchmarks.lir.GraalCompilerState;
-import org.graalvm.compiler.nodes.cfg.ControlFlowGraph;
+import jdk.graal.compiler.lir.LIR;
+import jdk.graal.compiler.microbenchmarks.lir.GraalCompilerState;
+import jdk.graal.compiler.nodes.cfg.ControlFlowGraph;
 
 /**
  * State class for working with {@link ControlFlowGraph} and {@link LIR}.
