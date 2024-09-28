@@ -150,7 +150,7 @@ public abstract class BasicBlock<T extends BasicBlock<T>> {
 
     public abstract int getSuccessorCount();
 
-    private boolean contains(T key, boolean usePred) {
+    private boolean contains(BasicBlock<?> key, boolean usePred) {
         for (int i = 0; i < (usePred ? getPredecessorCount() : getSuccessorCount()); i++) {
             T b = usePred ? getPredecessorAt(i) : getSuccessorAt(i);
             if (b == key) {
@@ -160,11 +160,11 @@ public abstract class BasicBlock<T extends BasicBlock<T>> {
         return false;
     }
 
-    public boolean containsPred(T key) {
+    public boolean containsPred(BasicBlock<?> key) {
         return contains(key, true);
     }
 
-    public boolean containsSucc(T key) {
+    public boolean containsSucc(BasicBlock<?> key) {
         return contains(key, false);
     }
 
