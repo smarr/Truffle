@@ -75,7 +75,6 @@ import jdk.vm.ci.code.DebugInfo;
 import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.meta.Value;
-import org.graalvm.collections.UnmodifiableMapCursor;
 
 /**
  * Utility for printing Graal IR at various compilation phases.
@@ -217,18 +216,6 @@ class CFGPrinter extends CompilationPrinter {
         }
     }
 
-    private void printBlock(BasicBlock<?> block, boolean printNodes) {
-        if (block == null) {
-            return;
-        }
-        printBlockProlog(block);
-        if (printNodes) {
-            assert block instanceof HIRBlock;
-            printNodes((HIRBlock) block);
-        }
-        printBlockEpilog(block);
-    }
-
     private void printBlockEpilog(BasicBlock<?> block) {
         printLIR(block);
         end("block");
@@ -284,41 +271,6 @@ class CFGPrinter extends CompilationPrinter {
         }
 
         out.print("probability ").println(Double.doubleToRawLongBits(block.getRelativeFrequency()));
-    }
-
-    private void printNodes(HIRBlock block) {
-        printedNodes = new NodeBitMap(cfg.graph);
-        begin("IR");
-        out.println("HIR");
-        out.disableIndentation();
-
-        if (block.getBeginNode() instanceof AbstractMergeNode) {
-            // Currently phi functions are not in the schedule, so print them separately here.
-            for (ValueNode phi : ((AbstractMergeNode) block.getBeginNode()).phis()) {
-                printNode(phi, false);
-            }
-        }
-
-        Node cur = block.getBeginNode();
-        while (true) { // TERMINATION ARGUMENT: suppress checkstyle
-            printNode(cur, false);
-
-            if (cur == block.getEndNode()) {
-                UnmodifiableMapCursor<Node, HIRBlock> cursor = latestScheduling.getEntries();
-                while (cursor.advance()) {
-                    if (cursor.getValue() == block && !inFixedSchedule(cursor.getKey()) && !printedNodes.isMarked(cursor.getKey())) {
-                        printNode(cursor.getKey(), true);
-                    }
-                }
-                break;
-            }
-            assert cur.successors().count() == 1;
-            cur = cur.successors().first();
-        }
-
-        out.enableIndentation();
-        end("IR");
-        printedNodes = null;
     }
 
     private void printNode(Node node, boolean unscheduled) {
