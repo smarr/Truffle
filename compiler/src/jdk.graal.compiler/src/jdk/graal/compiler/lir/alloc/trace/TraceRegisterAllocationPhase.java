@@ -122,7 +122,8 @@ public final class TraceRegisterAllocationPhase extends RegisterAllocationPhase 
         for (BasicBlock<?> block : lir.getControlFlowGraph().getBlocks()) {
             if (SSAUtil.isMerge(block)) {
                 SSAUtil.phiIn(lir, block).clearIncomingValues();
-                for (BasicBlock<?> pred : block.getPredecessors()) {
+                for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+                    BasicBlock<?> pred = block.getPredecessorAt(j);
                     SSAUtil.phiOut(lir, pred).clearOutgoingValues();
                 }
             }

@@ -234,7 +234,8 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
                  * blocks which are reached by switch statements may have be more than one
                  * predecessor but it will be guaranteed that all predecessors will be the same.
                  */
-                for (BasicBlock<?> predecessor : toBlock.getPredecessors()) {
+                for (int j = 0; j < toBlock.getPredecessorCount(); j += 1) {
+                    BasicBlock<?> predecessor = toBlock.getPredecessorAt(j);
                     assert fromBlock == predecessor : "all critical edges must be broken";
                 }
             }
@@ -438,7 +439,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
             BasicBlock<?> endBlock = blocks[blocks.length - 1];
             if (endBlock.isLoopEnd()) {
                 assert endBlock.getSuccessorCount() == 1;
-                BasicBlock<?> targetBlock = endBlock.getSuccessors()[0];
+                BasicBlock<?> targetBlock = endBlock.getSuccessorAt(0);
                 assert targetBlock.isLoopHeader() : String.format("Successor %s or loop end %s is not a loop header?", targetBlock, endBlock);
                 if (resultTraces.getTraceForBlock(targetBlock).equals(trace)) {
                     resolveLoopBackEdge(endBlock, targetBlock);

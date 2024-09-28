@@ -83,7 +83,7 @@ public class TraceUtil {
             return false;
         }
         if (block.getPredecessorCount() == 1) {
-            return !result.getTraceForBlock(block.getPredecessors()[0]).equals(trace);
+            return !result.getTraceForBlock(block.getPredecessorAt(0)).equals(trace);
         }
         return true;
     }
@@ -95,7 +95,7 @@ public class TraceUtil {
             return false;
         }
         if (block.getSuccessorCount() == 1) {
-            return !result.getTraceForBlock(block.getSuccessors()[0]).equals(trace);
+            return !result.getTraceForBlock(block.getSuccessorAt(0)).equals(trace);
         }
         return true;
     }

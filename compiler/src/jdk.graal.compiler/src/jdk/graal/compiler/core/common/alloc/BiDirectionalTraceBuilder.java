@@ -140,7 +140,8 @@ public final class BiDirectionalTraceBuilder {
      */
     private BasicBlock<?> selectPredecessor(BasicBlock<?> block) {
         BasicBlock<?> next = null;
-        for (BasicBlock<?> pred : block.getPredecessors()) {
+        for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+            BasicBlock<?> pred = block.getPredecessorAt(j);
             if (!processed(pred) && !isBackEdge(pred, block) && (next == null || pred.getRelativeFrequency() > next.getRelativeFrequency())) {
                 next = pred;
             }
@@ -149,7 +150,7 @@ public final class BiDirectionalTraceBuilder {
     }
 
     private static boolean isBackEdge(BasicBlock<?> from, BasicBlock<?> to) {
-        assert Arrays.asList(from.getSuccessors()).contains(to) : "No edge from " + from + " to " + to;
+        assert from.containsSucc(to) : "No edge from " + from + " to " + to;
         return from.isLoopEnd() && to.isLoopHeader() && from.getLoop().equals(to.getLoop());
     }
 
@@ -158,7 +159,8 @@ public final class BiDirectionalTraceBuilder {
      */
     private BasicBlock<?> selectSuccessor(BasicBlock<?> block) {
         BasicBlock<?> next = null;
-        for (BasicBlock<?> succ : block.getSuccessors()) {
+        for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+            BasicBlock<?> succ = block.getSuccessorAt(j);
             if (!processed(succ) && (next == null || succ.getRelativeFrequency() > next.getRelativeFrequency())) {
                 next = succ;
             }

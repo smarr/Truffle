@@ -123,7 +123,8 @@ final class TraceRegisterVerifier {
             }
 
             // iterate all successors
-            for (BasicBlock<?> succ : block.getSuccessors()) {
+            for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                BasicBlock<?> succ = block.getSuccessorAt(j);
                 processSuccessor(succ, inputState);
             }
         }

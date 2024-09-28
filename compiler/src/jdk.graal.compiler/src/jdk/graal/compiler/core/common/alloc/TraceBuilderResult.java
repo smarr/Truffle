@@ -78,7 +78,8 @@ public final class TraceBuilderResult {
         /* TODO (je): not efficient. find better solution. */
         for (int i = index; i < trace.length; i++) {
             BasicBlock<?> block = trace[1];
-            for (BasicBlock<?> pred : block.getPredecessors()) {
+            for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+                BasicBlock<?> pred = block.getPredecessorAt(j);
                 if (getTraceForBlock(pred).getId() != traceNr) {
                     return true;
                 }
@@ -105,11 +106,12 @@ public final class TraceBuilderResult {
             for (BasicBlock<?> current : trace.getBlocks()) {
                 BasicBlock<?> block = current;
                 assert traceBuilderResult.getTraceForBlock(block).getId() == i : "Trace number mismatch for block " + block + ": " + traceBuilderResult.getTraceForBlock(block) + " vs. " + i;
-                assert last == null || Arrays.asList(current.getPredecessors()).contains(last) : "Last block (" + last + ") not a predecessor of " + current;
+                assert last == null || current.containsPred(last) : "Last block (" + last + ") not a predecessor of " + current;
                 assert current.getLinearScanNumber() == blockNumber : "Blocks not numbered correctly: " + current.getLinearScanNumber() + " vs. " + blockNumber;
                 last = current;
                 blockNumber++;
-                for (BasicBlock<?> sux : block.getSuccessors()) {
+                for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                    BasicBlock<?> sux = block.getSuccessorAt(j);
                     Trace suxTrace = traceBuilderResult.getTraceForBlock(sux);
                     assert suxTraces.get(suxTrace.getId()) : "Successor Trace " + suxTrace + " for block " + sux + " not in successor traces of " + trace;
                 }
@@ -145,7 +147,8 @@ public final class TraceBuilderResult {
             assert successors.size() == 0 : "Can only connect traces once!";
 
             for (BasicBlock<?> block : trace.getBlocks()) {
-                for (BasicBlock<?> succ : block.getSuccessors()) {
+                for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                    BasicBlock<?> succ = block.getSuccessorAt(j);
                     Trace succTrace = blockToTrace[succ.getId()];
                     int succId = succTrace.getId();
                     if (!added.get(succId)) {

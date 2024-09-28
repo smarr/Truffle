@@ -51,6 +51,7 @@ import jdk.graal.compiler.debug.TTY;
 import jdk.graal.compiler.graph.Graph;
 import jdk.graal.compiler.java.BciBlockMapping;
 import jdk.graal.compiler.lir.LIR;
+import jdk.graal.compiler.lir.alloc.trace.GlobalLivenessInfo;
 import jdk.graal.compiler.lir.debug.IntervalDumper;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.nodes.StructuredGraph;

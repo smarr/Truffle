@@ -57,6 +57,7 @@ import jdk.graal.compiler.lir.debug.IntervalDumper.IntervalVisitor;
 import jdk.graal.compiler.lir.gen.LIRGenerationResult;
 import jdk.graal.compiler.nodeinfo.Verbosity;
 import jdk.graal.compiler.nodes.AbstractBeginNode;
+import jdk.graal.compiler.nodes.AbstractEndNode;
 import jdk.graal.compiler.nodes.AbstractMergeNode;
 import jdk.graal.compiler.nodes.FixedNode;
 import jdk.graal.compiler.nodes.FixedWithNextNode;
@@ -191,7 +192,8 @@ class CFGPrinter extends CompilationPrinter {
             PhiNode phi = (PhiNode) node;
             HIRBlock phiBlock = latestScheduling.get(phi.merge());
             assert phiBlock != null;
-            for (HIRBlock pred : phiBlock.getPredecessors()) {
+            for (int i = 0; i < phiBlock.getPredecessorCount(); i += 1) {
+                HIRBlock pred = phiBlock.getPredecessorAt(i);
                 schedule(phi.valueAt((AbstractEndNode) pred.getEndNode()), pred);
             }
 
@@ -763,13 +765,24 @@ class CFGPrinter extends CompilationPrinter {
         out.print("nr ").print(block.toString()).print(COLUMN_END).print(" instruction ");
 
         if (block.getPredecessorCount() > 0) {
+            List<BasicBlock<?>> preds = new ArrayList<>();
+            for (int i = 0; i < block.getPredecessorCount(); i += 1) {
+                preds.add(block.getPredecessorAt(i));
+            }
+
             out.print("<- ");
-            printBlockListWithTrace(Arrays.asList(block.getPredecessors()), traceBuilderResult);
+            printBlockListWithTrace(preds, traceBuilderResult);
             out.print(" ");
         }
+
         if (block.getSuccessorCount() > 0) {
+            List<BasicBlock<?>> succs = new ArrayList<>();
+            for (int i = 0; i < block.getSuccessorCount(); i += 1) {
+                succs.add(block.getSuccessorAt(i));
+            }
+
             out.print("-> ");
-            printBlockListWithTrace(Arrays.asList(block.getSuccessors()), traceBuilderResult);
+            printBlockListWithTrace(succs, traceBuilderResult);
         }
 
         out.print(COLUMN_END);
@@ -801,7 +814,8 @@ class CFGPrinter extends CompilationPrinter {
     private static List<Trace> getSuccessors(Trace trace, TraceBuilderResult traceBuilderResult) {
         BitSet bs = new BitSet(traceBuilderResult.getTraces().size());
         for (BasicBlock<?> block : trace.getBlocks()) {
-            for (BasicBlock<?> s : block.getSuccessors()) {
+            for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                BasicBlock<?> s = block.getSuccessorAt(j);
                 Trace otherTrace = traceBuilderResult.getTraceForBlock(s);
                 int otherTraceId = otherTrace.getId();
                 if (trace.getId() != otherTraceId || isLoopBackEdge(block, s)) {
@@ -819,7 +833,8 @@ class CFGPrinter extends CompilationPrinter {
     private static List<Trace> getPredecessors(Trace trace, TraceBuilderResult traceBuilderResult) {
         BitSet bs = new BitSet(traceBuilderResult.getTraces().size());
         for (BasicBlock<?> block : trace.getBlocks()) {
-            for (BasicBlock<?> p : block.getPredecessors()) {
+            for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+                BasicBlock<?> p = block.getPredecessorAt(j);
                 Trace otherTrace = traceBuilderResult.getTraceForBlock(p);
                 int otherTraceId = otherTrace.getId();
                 if (trace.getId() != otherTraceId || isLoopBackEdge(p, block)) {

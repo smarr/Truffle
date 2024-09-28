@@ -120,7 +120,8 @@ public final class UniDirectionalTraceBuilder {
     }
 
     private boolean checkPredecessorsProcessed(BasicBlock<?> block) {
-        for (BasicBlock<?> pred : block.getPredecessors()) {
+        for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+            BasicBlock<?> pred = block.getPredecessorAt(j);
             assert processed(pred) : "Predecessor unscheduled: " + pred;
         }
         return true;
@@ -131,7 +132,8 @@ public final class UniDirectionalTraceBuilder {
      * the count reaches 0.
      */
     private void unblock(BasicBlock<?> block) {
-        for (BasicBlock<?> successor : block.getSuccessors()) {
+        for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+            BasicBlock<?> successor = block.getSuccessorAt(j);
             if (!processed(successor)) {
                 int blockCount = --blocked[successor.getId()];
                 assert blockCount >= 0;
@@ -147,7 +149,8 @@ public final class UniDirectionalTraceBuilder {
      */
     private BasicBlock<?> selectNext(BasicBlock<?> block) {
         BasicBlock<?> next = null;
-        for (BasicBlock<?> successor : block.getSuccessors()) {
+        for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+            BasicBlock<?> successor = block.getSuccessorAt(j);
             if (!processed(successor) && (next == null || successor.getRelativeFrequency() > next.getRelativeFrequency())) {
                 next = successor;
             }

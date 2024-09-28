@@ -72,14 +72,14 @@ public final class GlobalLivenessInfo {
         public void setIncoming(BasicBlock<?> block, int[] varsIn) {
             assert info.blockToVarIn[block.getId()] == null;
             assert verifyVars(varsIn);
-            assert storesIncoming(block) || info.blockToVarOut[block.getPredecessors()[0].getId()] == varsIn;
+            assert storesIncoming(block) || info.blockToVarOut[block.getPredecessorAt(0).getId()] == varsIn;
             info.blockToVarIn[block.getId()] = varsIn;
         }
 
         public void setOutgoing(BasicBlock<?> block, int[] varsOut) {
             assert info.blockToVarOut[block.getId()] == null;
             assert verifyVars(varsOut);
-            assert storesOutgoing(block) || info.blockToVarIn[block.getSuccessors()[0].getId()] == varsOut;
+            assert storesOutgoing(block) || info.blockToVarIn[block.getSuccessorAt(0).getId()] == varsOut;
             info.blockToVarOut[block.getId()] = varsOut;
         }
 
@@ -150,7 +150,7 @@ public final class GlobalLivenessInfo {
          * The second condition handles non-critical empty blocks, introduced, e.g., by two
          * consecutive loop-exits.
          */
-        return block.getSuccessorCount() != 1 || block.getSuccessors()[0].getPredecessorCount() == 1;
+        return block.getSuccessorCount() != 1 || block.getSuccessorAt(0).getPredecessorCount() == 1;
     }
 
     /**

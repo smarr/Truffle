@@ -99,7 +99,8 @@ public final class TraceGlobalMoveResolutionPhase {
             BasicBlock<?> fromBlock = nextBlock;
             nextBlock = traceBlocks[i];
             if (fromBlock.getSuccessorCount() > 1) {
-                for (BasicBlock<?> toBlock : fromBlock.getSuccessors()) {
+                for (int j = 0; j < fromBlock.getSuccessorCount(); j += 1) {
+                    BasicBlock<?> toBlock = fromBlock.getSuccessorAt(j);
                     if (toBlock != nextBlock) {
                         interTraceEdge(resultTraces, livenessInfo, lir, moveResolver, fromBlock, toBlock);
                     }
@@ -108,7 +109,8 @@ public final class TraceGlobalMoveResolutionPhase {
         }
         // last block
         assert nextBlock == traceBlocks[traceLength - 1];
-        for (BasicBlock<?> toBlock : nextBlock.getSuccessors()) {
+        for (int j = 0; j < nextBlock.getSuccessorCount(); j += 1) {
+            BasicBlock<?> toBlock = nextBlock.getSuccessorAt(j);
             if (resultTraces.getTraceForBlock(nextBlock) != resultTraces.getTraceForBlock(toBlock)) {
                 interTraceEdge(resultTraces, livenessInfo, lir, moveResolver, nextBlock, toBlock);
             }
@@ -172,11 +174,11 @@ public final class TraceGlobalMoveResolutionPhase {
     }
 
     private static boolean verifyEdge(BasicBlock<?> fromBlock, BasicBlock<?> toBlock) {
-        assert Arrays.asList(toBlock.getPredecessors()).contains(fromBlock) : String.format("%s not in predecessor list: %s", fromBlock,
+        assert toBlock.containsPred(fromBlock) : String.format("%s not in predecessor list: %s", fromBlock,
                         Arrays.toString(toBlock.getPredecessors()));
         assert fromBlock.getSuccessorCount() == 1 || toBlock.getPredecessorCount() == 1 : String.format("Critical Edge? %s has %d successors and %s has %d predecessors",
                         fromBlock, fromBlock.getSuccessorCount(), toBlock, toBlock.getPredecessorCount());
-        assert Arrays.asList(fromBlock.getSuccessors()).contains(toBlock) : String.format("Predecessor block %s has wrong successor: %s, should contain: %s", fromBlock,
+        assert fromBlock.containsSucc(toBlock) : String.format("Predecessor block %s has wrong successor: %s, should contain: %s", fromBlock,
                         Arrays.toString(fromBlock.getSuccessors()), toBlock);
         return true;
     }

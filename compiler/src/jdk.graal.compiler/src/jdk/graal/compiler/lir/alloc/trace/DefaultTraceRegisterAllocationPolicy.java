@@ -120,7 +120,8 @@ public final class DefaultTraceRegisterAllocationPolicy {
         private static boolean containsExceptionEdge(Trace trace) {
             for (BasicBlock<?> block : trace.getBlocks()) {
                 // check if one of the successors is an exception handler
-                for (BasicBlock<?> succ : block.getSuccessors()) {
+                for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                    BasicBlock<?> succ = block.getSuccessorAt(j);
                     if (succ.isExceptionEntry()) {
                         return true;
                     }

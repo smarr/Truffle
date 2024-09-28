@@ -634,7 +634,7 @@ public final class TraceLinearScanLifetimeAnalysisPhase extends TraceLinearScanA
                 }
                 assert traceHeadBlock.getPredecessorCount() == 1 : "Trace head with more than one predecessor?!" + traceHeadBlock;
 
-                BasicBlock<?> pred = traceHeadBlock.getPredecessors()[0];
+                BasicBlock<?> pred = traceHeadBlock.getPredecessorAt(0);
                 assert traceBuilderResult.getTraceForBlock(pred).getId() < traceBuilderResult.getTraceForBlock(traceHeadBlock).getId() : "Not yet allocated? " + pred;
 
                 GlobalLivenessInfo livenessInfo = allocator.getGlobalLivenessInfo();

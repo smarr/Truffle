@@ -206,7 +206,9 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
         private BitSet mergeLiveSets(final BasicBlock<?> block) {
             assert block != null;
             final BitSet liveOut = new BitSet(liveSetSize());
-            for (BasicBlock<?> successor : block.getSuccessors()) {
+
+            for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                BasicBlock<?> successor = block.getSuccessorAt(j);
                 BitSet succLiveIn = getLiveIn(successor);
                 if (succLiveIn != null) {
                     liveOut.or(succLiveIn);
@@ -276,7 +278,7 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
         private void buildIncoming(BasicBlock<?> block) {
             if (!GlobalLivenessInfo.storesIncoming(block)) {
                 assert block.getPredecessorCount() == 1;
-                assert GlobalLivenessInfo.storesOutgoing(block.getPredecessors()[0]) : "No incoming liveness info: " + block;
+                assert GlobalLivenessInfo.storesOutgoing(block.getPredecessorAt(0)) : "No incoming liveness info: " + block;
                 return;
             }
 
@@ -291,13 +293,14 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
                  * block which might cause out/in mismatch. Per construction the live sets of all
                  * predecessors are equal.
                  */
-                BitSet predLiveOut = getLiveOut(block.getPredecessors()[0]);
+                BitSet predLiveOut = getLiveOut(block.getPredecessorAt(0));
                 liveInArray = predLiveOut.isEmpty() ? livenessInfoBuilder.emptySet : bitSetToIntArray(predLiveOut);
             }
 
             livenessInfoBuilder.setIncoming(block, liveInArray);
             // reuse the same array for outgoing variables in predecessors
-            for (BasicBlock<?> pred : block.getPredecessors()) {
+            for (int j = 0; j < block.getPredecessorCount(); j += 1) {
+                BasicBlock<?> pred = block.getPredecessorAt(j);
                 livenessInfoBuilder.setOutgoing(pred, liveInArray);
             }
         }
@@ -306,14 +309,15 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
             BitSet liveOut = getLiveOut(block);
             if (!GlobalLivenessInfo.storesOutgoing(block)) {
                 assert GlobalLivenessInfo.storesOutgoing(block) || block.getSuccessorCount() == 1;
-                assert GlobalLivenessInfo.storesOutgoing(block) || GlobalLivenessInfo.storesIncoming(block.getSuccessors()[0]) : "No outgoing liveness info: " + block;
+                assert GlobalLivenessInfo.storesOutgoing(block) || GlobalLivenessInfo.storesIncoming(block.getSuccessorAt(0)) : "No outgoing liveness info: " + block;
                 return;
             }
             int[] liveOutArray = liveOut.isEmpty() ? livenessInfoBuilder.emptySet : bitSetToIntArray(liveOut);
 
             livenessInfoBuilder.setOutgoing(block, liveOutArray);
             // reuse the same array for incoming variables in successors
-            for (BasicBlock<?> succ : block.getSuccessors()) {
+            for (int j = 0; j < block.getSuccessorCount(); j += 1) {
+                BasicBlock<?> succ = block.getSuccessorAt(j);
                 livenessInfoBuilder.setIncoming(succ, liveOutArray);
             }
         }

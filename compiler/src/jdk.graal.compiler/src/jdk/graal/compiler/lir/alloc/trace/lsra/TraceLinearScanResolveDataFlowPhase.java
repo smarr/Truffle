@@ -108,7 +108,8 @@ final class TraceLinearScanResolveDataFlowPhase extends TraceLinearScanAllocatio
                      * one predecessor but it will be guaranteed that all predecessors will be the
                      * same.
                      */
-                    for (BasicBlock<?> predecessor : toBlock.getPredecessors()) {
+                    for (int j = 0; j < toBlock.getPredecessorCount(); j += 1) {
+                        BasicBlock<?> predecessor = toBlock.getPredecessorAt(j);
                         assert fromBlock == predecessor : "all critical edges must be broken";
                     }
                 }
@@ -141,7 +142,7 @@ final class TraceLinearScanResolveDataFlowPhase extends TraceLinearScanAllocatio
                 assert blocks[blocks.length - 1].equals(toBlock);
                 if (toBlock.isLoopEnd()) {
                     assert toBlock.getSuccessorCount() == 1;
-                    BasicBlock<?> loopHeader = toBlock.getSuccessors()[0];
+                    BasicBlock<?> loopHeader = toBlock.getSuccessorAt(0);
                     if (containedInTrace(currentTrace, loopHeader)) {
                         resolveCollectMappings(toBlock, loopHeader, moveResolver);
                     }
