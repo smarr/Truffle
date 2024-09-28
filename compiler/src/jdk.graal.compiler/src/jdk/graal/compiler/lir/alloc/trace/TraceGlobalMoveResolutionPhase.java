@@ -33,6 +33,7 @@ import static jdk.graal.compiler.lir.alloc.trace.TraceUtil.asShadowedRegisterVal
 import static jdk.graal.compiler.lir.alloc.trace.TraceUtil.isShadowedRegisterValue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import jdk.graal.compiler.core.common.alloc.RegisterAllocationConfig;
 import jdk.graal.compiler.core.common.alloc.Trace;
@@ -173,13 +174,29 @@ public final class TraceGlobalMoveResolutionPhase {
         return isIllegal(to) || isConstantValue(to);
     }
 
+    private static String getCessorString(boolean isPredecessor, BasicBlock<?> block) {
+        ArrayList<BasicBlock<?>> cessorList = new ArrayList<>();
+        if (isPredecessor) {
+            for (int i = 0; i < block.getPredecessorCount(); i++) {
+                cessorList.add(block.getPredecessorAt(i));
+            }
+        } else {
+            for (int i = 0; i < block.getSuccessorCount(); i++) {
+                cessorList.add(block.getSuccessorAt(i));
+            }
+        }
+
+        BasicBlock<?>[] arr = cessorList.toArray(new BasicBlock<?>[cessorList.size()]);
+        return Arrays.toString(arr);
+    }
+
     private static boolean verifyEdge(BasicBlock<?> fromBlock, BasicBlock<?> toBlock) {
         assert toBlock.containsPred(fromBlock) : String.format("%s not in predecessor list: %s", fromBlock,
-                        Arrays.toString(toBlock.getPredecessors()));
+                        getCessorString(true, toBlock));
         assert fromBlock.getSuccessorCount() == 1 || toBlock.getPredecessorCount() == 1 : String.format("Critical Edge? %s has %d successors and %s has %d predecessors",
                         fromBlock, fromBlock.getSuccessorCount(), toBlock, toBlock.getPredecessorCount());
         assert fromBlock.containsSucc(toBlock) : String.format("Predecessor block %s has wrong successor: %s, should contain: %s", fromBlock,
-                        Arrays.toString(fromBlock.getSuccessors()), toBlock);
+                        getCessorString(false, fromBlock), toBlock);
         return true;
     }
 
