@@ -26,6 +26,7 @@ package jdk.graal.compiler.lir;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 
 import org.graalvm.collections.EconomicSet;
 import org.graalvm.collections.Equivalence;
@@ -74,6 +75,7 @@ public class StandardOp {
      */
     public static final class LabelOp extends LIRInstruction implements LabelHoldingOp {
         public static final LIRInstructionClass<LabelOp> TYPE = LIRInstructionClass.create(LabelOp.class);
+        public static final EnumSet<OperandFlag> incomingFlags = EnumSet.of(OperandFlag.REG, OperandFlag.STACK);
 
         /**
          * In the LIR, every register and variable must be defined before it is used. For method
@@ -180,6 +182,7 @@ public class StandardOp {
      */
     public static class JumpOp extends LIRInstruction implements BlockEndOp {
         public static final LIRInstructionClass<JumpOp> TYPE = LIRInstructionClass.create(JumpOp.class);
+        public static final EnumSet<OperandFlag> outgoingFlags = EnumSet.of(OperandFlag.REG, OperandFlag.STACK, OperandFlag.CONST, OperandFlag.OUTGOING);
 
         @Alive({OperandFlag.REG, OperandFlag.STACK, OperandFlag.CONST, OperandFlag.OUTGOING}) private Value[] outgoingValues;
 
