@@ -27,15 +27,39 @@ package jdk.graal.compiler.lir.phases;
 import jdk.graal.compiler.core.common.alloc.RegisterAllocationConfig;
 import jdk.graal.compiler.lir.gen.MoveFactory;
 
+import java.util.ArrayList;
+
 public abstract class AllocationPhase extends LIRPhase<AllocationPhase.AllocationContext> {
 
     public static final class AllocationContext {
         public final MoveFactory spillMoveFactory;
         public final RegisterAllocationConfig registerAllocationConfig;
 
+        private ArrayList<Object> context;
+
         public AllocationContext(MoveFactory spillMoveFactory, RegisterAllocationConfig registerAllocationConfig) {
             this.spillMoveFactory = spillMoveFactory;
             this.registerAllocationConfig = registerAllocationConfig;
+            this.context = null;
+        }
+
+        public <T> void contextAdd(T obj) {
+            if (context == null) {
+                context = new ArrayList<>();
+            }
+            context.add(obj);
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T contextLookup(Class<T> clazz) {
+            if (context != null) {
+                for (Object e : context) {
+                    if (clazz.isInstance(e)) {
+                        return (T) e;
+                    }
+                }
+            }
+            return null;
         }
     }
 
