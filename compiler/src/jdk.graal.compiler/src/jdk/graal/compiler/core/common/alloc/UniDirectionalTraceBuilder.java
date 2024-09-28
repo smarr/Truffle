@@ -33,14 +33,15 @@ import jdk.graal.compiler.core.common.alloc.TraceBuilderResult.TrivialTracePredi
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.debug.DebugContext;
 import jdk.graal.compiler.debug.Indent;
+import jdk.graal.compiler.lir.LIR;
 
 /**
  * Computes traces by starting at a trace head and keep adding successors as long as possible.
  */
 public final class UniDirectionalTraceBuilder {
 
-    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
-        return new UniDirectionalTraceBuilder(blocks).build(debug, startBlock, blocks, pred);
+    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred, LIR lir) {
+        return new UniDirectionalTraceBuilder(blocks, lir).build(debug, startBlock, blocks, pred);
     }
 
     private final PriorityQueue<BasicBlock<?>> worklist;
@@ -51,15 +52,15 @@ public final class UniDirectionalTraceBuilder {
     private final int[] blocked;
     private final Trace[] blockToTrace;
 
-    private UniDirectionalTraceBuilder(BasicBlock<?>[] blocks) {
+    private UniDirectionalTraceBuilder(int[] blocks, LIR lir) {
         processed = new BitSet(blocks.length);
         worklist = new PriorityQueue<>(UniDirectionalTraceBuilder::compare);
         assert (worklist != null);
 
         blocked = new int[blocks.length];
         blockToTrace = new Trace[blocks.length];
-        for (BasicBlock<?> block : blocks) {
-            blocked[block.getId()] = block.getPredecessorCount();
+        for (int blockId : blocks) {
+            blocked[blockId] = lir.getBlockById(blockId).getPredecessorCount();
         }
     }
 
@@ -72,7 +73,7 @@ public final class UniDirectionalTraceBuilder {
     }
 
     @SuppressWarnings("try")
-    private TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
+    private TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred) {
         try (Indent indent = debug.logAndIndent("UniDirectionalTraceBuilder: start trace building: %s", startBlock)) {
             ArrayList<Trace> traces = buildTraces(debug, startBlock);
             return TraceBuilderResult.create(debug, blocks, traces, blockToTrace, pred);

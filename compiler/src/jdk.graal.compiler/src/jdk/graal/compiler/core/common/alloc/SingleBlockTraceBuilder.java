@@ -29,23 +29,25 @@ import java.util.ArrayList;
 import jdk.graal.compiler.core.common.alloc.TraceBuilderResult.TrivialTracePredicate;
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.debug.DebugContext;
+import jdk.graal.compiler.lir.LIR;
 
 /**
  * Builds traces consisting of a single basic block.
  */
 public final class SingleBlockTraceBuilder {
 
-    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
-        return build(debug, startBlock, blocks, pred);
+    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred, LIR lir) {
+        return build(debug, startBlock, blocks, pred, lir);
     }
 
-    private static TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
+    private static TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred, LIR lir) {
         Trace[] blockToTrace = new Trace[blocks.length];
         ArrayList<Trace> traces = new ArrayList<>(blocks.length);
 
-        for (BasicBlock<?> block : blocks) {
+        for (int blockId : blocks) {
+            BasicBlock<?> block = lir.getBlockById(blockId);
             Trace trace = new Trace(new BasicBlock<?>[]{block});
-            blockToTrace[block.getId()] = trace;
+            blockToTrace[blockId] = trace;
             block.setLinearScanNumber(0);
             trace.setId(traces.size());
             traces.add(trace);

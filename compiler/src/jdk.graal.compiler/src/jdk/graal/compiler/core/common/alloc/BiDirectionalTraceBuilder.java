@@ -34,6 +34,7 @@ import jdk.graal.compiler.core.common.alloc.TraceBuilderResult.TrivialTracePredi
 import jdk.graal.compiler.core.common.cfg.BasicBlock;
 import jdk.graal.compiler.debug.DebugContext;
 import jdk.graal.compiler.debug.Indent;
+import jdk.graal.compiler.lir.LIR;
 
 /**
  * Computes traces by selecting the unhandled block with the highest execution frequency and going
@@ -41,22 +42,28 @@ import jdk.graal.compiler.debug.Indent;
  */
 public final class BiDirectionalTraceBuilder {
 
-    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
-        return new BiDirectionalTraceBuilder(blocks).build(debug, startBlock, blocks, pred);
+    public static TraceBuilderResult computeTraces(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred, LIR lir) {
+        return new BiDirectionalTraceBuilder(blocks, lir).build(debug, startBlock, blocks, pred);
     }
 
     private final Deque<BasicBlock<?>> worklist;
     private final BitSet processed;
     private final Trace[] blockToTrace;
 
-    private BiDirectionalTraceBuilder(BasicBlock<?>[] blocks) {
+    private BiDirectionalTraceBuilder(int[] blocks, LIR lir) {
         processed = new BitSet(blocks.length);
-        worklist = createQueue(blocks);
+        worklist = createQueue(blocks, lir);
         blockToTrace = new Trace[blocks.length];
     }
 
-    private static Deque<BasicBlock<?>> createQueue(BasicBlock<?>[] blocks) {
-        ArrayList<BasicBlock<?>> queue = new ArrayList<>(Arrays.asList(blocks));
+    private static Deque<BasicBlock<?>> createQueue(int[] blocks, LIR lir) {
+        ArrayList<BasicBlock<?>> queue = new ArrayList<>(blocks.length);
+
+        for (int blockId : blocks) {
+            BasicBlock<?> block = lir.getBlockById(blockId);
+            queue.add(block);
+        }
+
         queue.sort(BiDirectionalTraceBuilder::compare);
         return new ArrayDeque<>(queue);
     }
@@ -70,7 +77,7 @@ public final class BiDirectionalTraceBuilder {
     }
 
     @SuppressWarnings("try")
-    private TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, BasicBlock<?>[] blocks, TrivialTracePredicate pred) {
+    private TraceBuilderResult build(DebugContext debug, BasicBlock<?> startBlock, int[] blocks, TrivialTracePredicate pred) {
         try (Indent indent = debug.logAndIndent("BiDirectionalTraceBuilder: start trace building")) {
             ArrayList<Trace> traces = buildTraces(debug);
             assert traces.get(0).getBlocks()[0].equals(startBlock) : "The first traces always contains the start block";

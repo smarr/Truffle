@@ -40,7 +40,7 @@ public final class TraceBuilderResult {
     private final ArrayList<Trace> traces;
     private final Trace[] blockToTrace;
 
-    static TraceBuilderResult create(DebugContext debug, BasicBlock<?>[] blocks, ArrayList<Trace> traces, Trace[] blockToTrace, TrivialTracePredicate pred) {
+    static TraceBuilderResult create(DebugContext debug, int[] blocks, ArrayList<Trace> traces, Trace[] blockToTrace, TrivialTracePredicate pred) {
         connect(traces, blockToTrace);
         ArrayList<Trace> newTraces = reorderTraces(debug, traces, pred);
         TraceBuilderResult traceBuilderResult = new TraceBuilderResult(newTraces, blockToTrace);

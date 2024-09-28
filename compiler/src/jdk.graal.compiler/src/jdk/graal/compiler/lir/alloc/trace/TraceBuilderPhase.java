@@ -68,9 +68,10 @@ public class TraceBuilderPhase extends AllocationPhase {
 
     @Override
     protected void run(TargetDescription target, LIRGenerationResult lirGenRes, AllocationContext context) {
-        BasicBlock<?>[] linearScanOrder = lirGenRes.getLIR().linearScanOrder();
-        BasicBlock<?> startBlock = linearScanOrder[0];
+        int[] linearScanOrder = lirGenRes.getLIR().linearScanOrder();
+        int startBlockId = linearScanOrder[0];
         LIR lir = lirGenRes.getLIR();
+        BasicBlock<?> startBlock = lir.getBlockById(startBlockId);
         assert startBlock.equals(lir.getControlFlowGraph().getStartBlock());
 
         final TraceBuilderResult traceBuilderResult = getTraceBuilderResult(lir, startBlock, linearScanOrder);
@@ -88,7 +89,7 @@ public class TraceBuilderPhase extends AllocationPhase {
         context.contextAdd(traceBuilderResult);
     }
 
-    private static TraceBuilderResult getTraceBuilderResult(LIR lir, BasicBlock<?> startBlock, BasicBlock<?>[] linearScanOrder) {
+    private static TraceBuilderResult getTraceBuilderResult(LIR lir, BasicBlock<?> startBlock, int[] linearScanOrder) {
         TraceBuilderResult.TrivialTracePredicate pred = getTrivialTracePredicate(lir);
 
         OptionValues options = lir.getOptions();
@@ -97,11 +98,11 @@ public class TraceBuilderPhase extends AllocationPhase {
         debug.log(DebugContext.BASIC_LEVEL, "Building Traces using %s", selectedTraceBuilder);
         switch (Options.TraceBuilding.getValue(options)) {
             case SingleBlock:
-                return SingleBlockTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred);
+                return SingleBlockTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred, lir);
             case BiDirectional:
-                return BiDirectionalTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred);
+                return BiDirectionalTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred, lir);
             case UniDirectional:
-                return UniDirectionalTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred);
+                return UniDirectionalTraceBuilder.computeTraces(debug, startBlock, linearScanOrder, pred, lir);
         }
         throw GraalError.shouldNotReachHere("Unknown trace building algorithm: " + Options.TraceBuilding.getValue(options));
     }
