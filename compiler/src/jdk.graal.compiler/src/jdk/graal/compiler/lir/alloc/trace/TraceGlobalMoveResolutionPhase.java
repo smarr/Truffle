@@ -109,7 +109,7 @@ public final class TraceGlobalMoveResolutionPhase {
             }
         }
         // last block
-        assert nextBlock == traceBlocks[traceLength - 1];
+        assert nextBlock == traceBlocks[traceLength - 1] : "Expect nextBlock to be the last block";
         for (int j = 0; j < nextBlock.getSuccessorCount(); j += 1) {
             BasicBlock<?> toBlock = nextBlock.getSuccessorAt(j);
             if (resultTraces.getTraceForBlock(nextBlock) != resultTraces.getTraceForBlock(toBlock)) {
@@ -131,7 +131,7 @@ public final class TraceGlobalMoveResolutionPhase {
                 instructions = lir.getLIRforBlock(fromBlock);
                 insertIdx = instructions.size() - 1;
             } else {
-                assert toBlock.getPredecessorCount() == 1;
+                assert toBlock.getPredecessorCount() == 1 : "Expected single predecessor";
                 instructions = lir.getLIRforBlock(toBlock);
                 insertIdx = 1;
             }
@@ -163,7 +163,7 @@ public final class TraceGlobalMoveResolutionPhase {
             // a strategy might reuse the locations array if locations are the same
             return;
         }
-        assert locFrom.length == locTo.length;
+        assert locFrom.length == locTo.length : "Expected same number of locations";
 
         for (int i = 0; i < locFrom.length; i++) {
             addMapping(moveResolver, locFrom[i], locTo[i]);

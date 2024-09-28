@@ -277,7 +277,7 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
 
         private void buildIncoming(BasicBlock<?> block) {
             if (!GlobalLivenessInfo.storesIncoming(block)) {
-                assert block.getPredecessorCount() == 1;
+                assert block.getPredecessorCount() == 1 : "Should only have one predecessor, but has: " + block.getPredecessorCount();
                 assert GlobalLivenessInfo.storesOutgoing(block.getPredecessorAt(0)) : "No incoming liveness info: " + block;
                 return;
             }
@@ -308,7 +308,7 @@ public final class GlobalLivenessAnalysisPhase extends AllocationPhase {
         private void buildOutgoing(BasicBlock<?> block) {
             BitSet liveOut = getLiveOut(block);
             if (!GlobalLivenessInfo.storesOutgoing(block)) {
-                assert GlobalLivenessInfo.storesOutgoing(block) || block.getSuccessorCount() == 1;
+                assert GlobalLivenessInfo.storesOutgoing(block) || block.getSuccessorCount() == 1 : "Should either store outgoings or have one successor";
                 assert GlobalLivenessInfo.storesOutgoing(block) || GlobalLivenessInfo.storesIncoming(block.getSuccessorAt(0)) : "No outgoing liveness info: " + block;
                 return;
             }

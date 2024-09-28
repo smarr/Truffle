@@ -87,7 +87,7 @@ final class FixedRange {
                     }
                     return range.from;
                 } else {
-                    assert range.from == intervalFrom;
+                    assert range.from == intervalFrom : "range should be from the interval";
                     if (range.from == range.to) {
                         range = range.next;
                         if (range == EndMarker) {

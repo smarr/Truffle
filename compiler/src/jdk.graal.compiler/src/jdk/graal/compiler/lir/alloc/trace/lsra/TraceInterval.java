@@ -349,12 +349,12 @@ final class TraceInterval extends IntervalHint {
     }
 
     public void setTo(int pos) {
-        assert intFrom == Integer.MAX_VALUE || intFrom < pos;
+        assert intFrom == Integer.MAX_VALUE || intFrom < pos : "Invalid interval 'to' position";
         intTo = pos;
     }
 
     public void setFrom(int pos) {
-        assert intTo == Integer.MAX_VALUE || pos < intTo;
+        assert intTo == Integer.MAX_VALUE || pos < intTo : "Invalid interval 'from' position";
         intFrom = pos;
     }
 
@@ -469,7 +469,7 @@ final class TraceInterval extends IntervalHint {
             i1 = this;
             i2 = i;
         }
-        assert i1.from() <= i2.from();
+        assert i1.from() <= i2.from() : "intervals not sorted";
 
         if (i1.to() <= i2.from()) {
             return -1;
@@ -807,10 +807,10 @@ final class TraceInterval extends IntervalHint {
 
         if (Assertions.detailedAssertionsEnabled(allocator.getOptions())) {
             for (int i = 0; i < numUsePos(); i++) {
-                assert getUsePos(i) < splitPos;
+                assert getUsePos(i) < splitPos : "use should be before split position";
             }
             for (int i = 0; i < result.numUsePos(); i++) {
-                assert result.getUsePos(i) >= splitPos;
+                assert result.getUsePos(i) >= splitPos : "new use should be at or after split position";
             }
         }
         return result;
@@ -927,7 +927,7 @@ final class TraceInterval extends IntervalHint {
     }
 
     private void usePosAdd(int pos, RegisterPriority registerPriority) {
-        assert usePosListSize == 0 || getUsePos(numUsePos() - 1) > pos;
+        assert usePosListSize == 0 || getUsePos(numUsePos() - 1) > pos : "inconsistent use position list";
         intListAdd(pos);
         intListAdd(registerPriority.ordinal());
     }

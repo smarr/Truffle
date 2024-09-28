@@ -141,7 +141,7 @@ final class TraceLinearScanResolveDataFlowPhase extends TraceLinearScanAllocatio
                 }
                 assert blocks[blocks.length - 1].equals(toBlock);
                 if (toBlock.isLoopEnd()) {
-                    assert toBlock.getSuccessorCount() == 1;
+                    assert toBlock.getSuccessorCount() == 1 : "Expected exactly one successor";
                     BasicBlock<?> loopHeader = toBlock.getSuccessorAt(0);
                     if (containedInTrace(currentTrace, loopHeader)) {
                         resolveCollectMappings(toBlock, loopHeader, moveResolver);
@@ -158,7 +158,7 @@ final class TraceLinearScanResolveDataFlowPhase extends TraceLinearScanAllocatio
                 // fromBlock and toBlock
                 int toId = allocator.getFirstLirInstructionId(toBlock);
                 int fromId = allocator.getLastLirInstructionId(fromBlock);
-                assert fromId >= 0;
+                assert fromId >= 0 : "Unexpected negative fromId: " + fromId;
                 LIR lir = allocator.getLIR();
                 if (SSAUtil.isMerge(toBlock)) {
                     JumpOp blockEnd = SSAUtil.phiOut(lir, fromBlock);

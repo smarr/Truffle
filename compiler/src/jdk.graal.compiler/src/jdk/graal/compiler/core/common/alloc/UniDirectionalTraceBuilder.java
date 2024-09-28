@@ -137,7 +137,7 @@ public final class UniDirectionalTraceBuilder {
             BasicBlock<?> successor = block.getSuccessorAt(j);
             if (!processed(successor)) {
                 int blockCount = --blocked[successor.getId()];
-                assert blockCount >= 0;
+                assert blockCount >= 0 : "Unexpected negative block count: " + blockCount;
                 if (blockCount == 0) {
                     worklist.add(successor);
                 }

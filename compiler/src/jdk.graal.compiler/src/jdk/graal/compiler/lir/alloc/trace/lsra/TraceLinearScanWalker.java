@@ -392,8 +392,8 @@ final class TraceLinearScanWalker {
     @SuppressWarnings("unused")
     private int insertIdAtBasicBlockBoundary(int opId) {
         assert allocator.isBlockBegin(opId) : "Not a block begin: " + opId;
-        assert allocator.instructionForId(opId) instanceof LabelOp;
-        assert allocator.instructionForId(opId - 2) instanceof BlockEndOp;
+        assert allocator.instructionForId(opId) instanceof LabelOp : "Expected to insert at a label/block start";
+        assert allocator.instructionForId(opId - 2) instanceof BlockEndOp : "Expected block end at offset";
 
         BasicBlock<?> toBlock = allocator.blockForId(opId);
         BasicBlock<?> fromBlock = allocator.blockForId(opId - 2);
@@ -784,7 +784,7 @@ final class TraceLinearScanWalker {
             // -2 is block end, -4 is the instruction before
             maxSpillPos -= 4;
         }
-        assert minSpillPos <= maxSpillPos;
+        assert minSpillPos <= maxSpillPos : "Inconsistent spill range";
         return maxSpillPos;
     }
 
@@ -1396,7 +1396,7 @@ final class TraceLinearScanWalker {
                         newState = State.Inactive;
                     }
                     if (prev == cur) {
-                        assert state == newState;
+                        assert state == newState : "wrong state";
                         prevprev = prev;
                         prev = cur.next;
                     }

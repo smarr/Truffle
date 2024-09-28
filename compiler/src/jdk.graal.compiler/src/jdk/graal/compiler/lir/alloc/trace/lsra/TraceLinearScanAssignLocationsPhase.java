@@ -120,7 +120,7 @@ final class TraceLinearScanAssignLocationsPhase extends TraceLinearScanAllocatio
                      */
                     return Value.ILLEGAL;
                 }
-                assert mode != OperandMode.DEF;
+                assert mode != OperandMode.DEF : "DEF operand not expected";
                 return new ConstantValue(allocator.getKind(interval), interval.getMaterializedValue());
             }
             return interval.location();
@@ -274,7 +274,7 @@ final class TraceLinearScanAssignLocationsPhase extends TraceLinearScanAllocatio
          * @return {@code true} if the instruction was deleted.
          */
         private boolean assignLocations(LIRInstruction op, ArrayList<LIRInstruction> instructions, int j) {
-            assert op != null && instructions.get(j) == op;
+            assert op != null && instructions.get(j) == op : "op not at expected position";
 
             // remove useless moves
             if (MoveOp.isMoveOp(op)) {

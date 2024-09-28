@@ -134,7 +134,7 @@ final class TraceRegisterVerifier {
         DebugContext debug = allocator.getDebug();
         for (int i = 0; i < stateSize(); i++) {
             Register reg = allocator.getRegisters().get(i);
-            assert reg.number == i;
+            assert reg.number == i : "register number mismatch";
             if (inputState[i] != null) {
                 debug.log(" %6s %4d  --  %s", reg, inputState[i].operandNumber, inputState[i]);
             } else {

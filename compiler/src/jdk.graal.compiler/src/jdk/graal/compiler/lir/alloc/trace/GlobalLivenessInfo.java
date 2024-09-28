@@ -72,20 +72,20 @@ public final class GlobalLivenessInfo {
         public void setIncoming(BasicBlock<?> block, int[] varsIn) {
             assert info.blockToVarIn[block.getId()] == null;
             assert verifyVars(varsIn);
-            assert storesIncoming(block) || info.blockToVarOut[block.getPredecessorAt(0).getId()] == varsIn;
+            assert storesIncoming(block) || info.blockToVarOut[block.getPredecessorAt(0).getId()] == varsIn : "Should either store incoming edges or already have the varsIn";
             info.blockToVarIn[block.getId()] = varsIn;
         }
 
         public void setOutgoing(BasicBlock<?> block, int[] varsOut) {
             assert info.blockToVarOut[block.getId()] == null;
             assert verifyVars(varsOut);
-            assert storesOutgoing(block) || info.blockToVarIn[block.getSuccessorAt(0).getId()] == varsOut;
+            assert storesOutgoing(block) || info.blockToVarIn[block.getSuccessorAt(0).getId()] == varsOut : "Should either store outgoing edges or already have the varsOut";
             info.blockToVarOut[block.getId()] = varsOut;
         }
 
         private static boolean verifyVars(int[] vars) {
             for (int var : vars) {
-                assert var >= 0;
+                assert var >= 0 : "Negative variable index: " + var;
             }
             return true;
         }
@@ -140,12 +140,12 @@ public final class GlobalLivenessInfo {
     }
 
     public static boolean storesIncoming(BasicBlock<?> block) {
-        assert block.getPredecessorCount() >= 0;
+        assert block.getPredecessorCount() >= 0 : "Unexpected negative predecessor count: " + block.getPredecessorCount();
         return block.getPredecessorCount() != 1;
     }
 
     public static boolean storesOutgoing(BasicBlock<?> block) {
-        assert block.getSuccessorCount() >= 0;
+        assert block.getSuccessorCount() >= 0 : "Unexpected negative successor count: " + block.getSuccessorCount();
         /*
          * The second condition handles non-critical empty blocks, introduced, e.g., by two
          * consecutive loop-exits.

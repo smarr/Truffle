@@ -446,7 +446,7 @@ final class TraceLocalMoveResolver {
             spillInterval(spillCandidate, fromInterval1, spillSlot1);
             return;
         }
-        assert mappingFromSize() > 1;
+        assert mappingFromSize() > 1 : "Expected more than two to break cycle";
         // Arbitrarily select the first entry for spilling.
         int stackSpillCandidate = 0;
         TraceInterval fromInterval = getMappingFrom(stackSpillCandidate);

@@ -188,7 +188,7 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
             if (interval == null) {
                 continue;
             }
-            assert from <= interval.from();
+            assert from <= interval.from() : "intervals not sorted";
             from = interval.from();
         }
         return true;
@@ -198,7 +198,7 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
         int from = -1;
         for (TraceInterval interval : intervals) {
             assert interval != null;
-            assert from <= interval.spillDefinitionPos();
+            assert from <= interval.spillDefinitionPos() : "intervals not sorted";
             from = interval.spillDefinitionPos();
         }
         return true;
@@ -281,14 +281,14 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
 
         public int getFirstLirInstructionId(BasicBlock<?> block) {
             int result = getLIR().getLIRforBlock(block).get(0).id();
-            assert result >= 0;
+            assert result >= 0 : "Unexpected negative block id: " + result;
             return result;
         }
 
         public int getLastLirInstructionId(BasicBlock<?> block) {
             ArrayList<LIRInstruction> instructions = getLIR().getLIRforBlock(block);
             int result = instructions.get(instructions.size() - 1).id();
-            assert result >= 0;
+            assert result >= 0 : "Unexpected negative block id: " + result;
             return result;
         }
 
@@ -373,7 +373,7 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
 
         boolean isBlockEnd(int opId) {
             boolean isBlockBegin = isBlockBegin(opId + 2);
-            assert isBlockBegin == (instructionForId(opId & (~1)) instanceof BlockEndOp);
+            assert isBlockBegin == (instructionForId(opId & (~1)) instanceof BlockEndOp) : "inconsistent operation in block";
             return isBlockBegin;
         }
 
@@ -835,9 +835,9 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
         private TraceInterval createInterval(Variable operand) {
             assert isLegal(operand);
             int operandNumber = operandNumber(operand);
-            assert operand.index == operandNumber;
+            assert operand.index == operandNumber : "inconsistent operand number";
             TraceInterval interval = new TraceInterval(operand);
-            assert operandNumber < intervalsSize;
+            assert operandNumber < intervalsSize : "operand number out of range";
             assert intervals[operandNumber] == null;
             intervals[operandNumber] = interval;
             return interval;
@@ -859,10 +859,10 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
             // increments intervalsSize
             Variable variable = createVariable(getKind(source));
 
-            assert intervalsSize <= intervals.length;
+            assert intervalsSize <= intervals.length : "intervals array too small";
 
             TraceInterval interval = createInterval(variable);
-            assert intervals[intervalsSize - 1] == interval;
+            assert intervals[intervalsSize - 1] == interval : "interval not created at end of array";
             return interval;
         }
 
@@ -904,7 +904,7 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
         }
 
         TraceInterval intervalFor(int operandNumber) {
-            assert operandNumber < intervalsSize;
+            assert operandNumber < intervalsSize : "operand number out of range";
             return intervals[operandNumber];
         }
 
@@ -953,7 +953,7 @@ public final class TraceLinearScanPhase extends TraceAllocationPhase<TraceAlloca
         LIRInstruction instructionForId(int opId) {
             assert isEven(opId) : "opId not even";
             LIRInstruction instr = opIdToInstructionMap[opIdToIndex(opId)];
-            assert instr.id() == opId;
+            assert instr.id() == opId : "inconsistent instruction id";
             return instr;
         }
 

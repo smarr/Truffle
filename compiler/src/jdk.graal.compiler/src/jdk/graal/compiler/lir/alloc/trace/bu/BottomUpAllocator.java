@@ -438,7 +438,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
             BasicBlock<?>[] blocks = trace.getBlocks();
             BasicBlock<?> endBlock = blocks[blocks.length - 1];
             if (endBlock.isLoopEnd()) {
-                assert endBlock.getSuccessorCount() == 1;
+                assert endBlock.getSuccessorCount() == 1 : "Expected only one successor, but got: " + endBlock.getSuccessorCount();
                 BasicBlock<?> targetBlock = endBlock.getSuccessorAt(0);
                 assert targetBlock.isLoopHeader() : String.format("Successor %s or loop end %s is not a loop header?", targetBlock, endBlock);
                 if (resultTraces.getTraceForBlock(targetBlock).equals(trace)) {
@@ -479,7 +479,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
 
             assert out != null;
             assert in != null;
-            assert out.length == in.length;
+            assert out.length == in.length : "Expect sanme number of locations";
 
             for (int i = 0; i < out.length; i++) {
                 Value incomingValue = in[i];
@@ -519,7 +519,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
 
         @SuppressWarnings("try")
         private void allocateInstruction(LIRInstruction op, BasicBlock<?> block, boolean isLabel, boolean isBlockEnd) {
-            assert op != null && op.id() == currentOpId;
+            assert op != null && op.id() == currentOpId : "Expected currentOp to be op";
             try (Indent indent = debug.logAndIndent("handle inst: %d: %s", op.id(), op)) {
                 try (Indent indent1 = debug.logAndIndent("output pos")) {
                     // spill caller saved registers
@@ -542,7 +542,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
                     op.forEachTemp(allocStackOrRegisterProcedure);
                     op.forEachOutput(allocStackOrRegisterProcedure);
                     if (isLabel) {
-                        assert op instanceof LabelOp;
+                        assert op instanceof LabelOp : "Expected label op";
                         processIncoming(block, op);
                     }
                 }
@@ -557,7 +557,7 @@ public final class BottomUpAllocator extends TraceAllocationPhase<TraceAllocatio
 
                     op.forEachAlive(allocStackOrRegisterProcedure);
                     if (isBlockEnd) {
-                        assert op instanceof BlockEndOp;
+                        assert op instanceof BlockEndOp : "Expected block end op";
                         processOutgoing(block, op);
                     }
                     op.forEachState(allocStackOrRegisterProcedure);
