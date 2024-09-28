@@ -167,4 +167,15 @@ public final class SSAUtil {
         }
         return -1;
     }
+
+    public static JumpOp phiOutOrNull(LIR lir, BasicBlock<?> block) {
+        if (block.getSuccessorCount() != 1) {
+            return null;
+        }
+        return phiOut(lir, block);
+    }
+
+    public static boolean isMerge(BasicBlock<?> block) {
+        return block.getPredecessorCount() > 1;
+    }
 }
