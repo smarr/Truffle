@@ -45,6 +45,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      - "trace*"
     paths-ignore:
       - '.devcontainer/**'
       - '.github/workflows/quarkus.yml'
