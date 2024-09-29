@@ -137,6 +137,11 @@ final class TraceLinearScanAssignLocationsPhase extends TraceLinearScanAllocatio
             if (isVirtualStackSlot(operand)) {
                 return operand;
             }
+
+            if (isRegister(operand)) {
+                return operand;
+            }
+
             int tempOpId = op.id();
             OperandMode mode = OperandMode.USE;
             BasicBlock<?> block = allocator.blockForId(tempOpId);
