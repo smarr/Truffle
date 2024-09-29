@@ -613,7 +613,7 @@ public final class TraceLinearScanLifetimeAnalysisPhase extends TraceLinearScanA
 
         private void numberInstruction(BasicBlock<?> block, LIRInstruction op, int index) {
             int opId = index << 1;
-            assert op.id() == -1 || op.id() == opId : "must match";
+            assert op.id() == -1 || op.id() == opId : "should be uninitialized or match";
             op.setId(opId);
             allocator.putOpIdMaps(index, op, block);
             assert allocator.instructionForId(opId) == op : "must match";
