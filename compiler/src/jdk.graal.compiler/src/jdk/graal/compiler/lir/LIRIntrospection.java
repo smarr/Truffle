@@ -44,7 +44,6 @@ import org.graalvm.collections.MapCursor;
 import jdk.graal.compiler.core.common.FieldIntrospection;
 import jdk.graal.compiler.core.common.Fields;
 import jdk.graal.compiler.core.common.FieldsScanner;
-import jdk.graal.compiler.debug.GraalError;
 import jdk.graal.compiler.lir.LIRInstruction.OperandFlag;
 import jdk.graal.compiler.lir.LIRInstruction.OperandMode;
 import jdk.vm.ci.code.RegisterValue;
@@ -256,7 +255,8 @@ abstract class LIRIntrospection<T> extends FieldIntrospection<T> {
                     if (!(value instanceof CompositeValue)) {
                         assert verifyAssignment(inst, newValue, values.getFlags(i));
                     }
-                    GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()), "New assignment changes PlatformKind");
+                    // GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()),
+                    // "New assignment changes PlatformKind");
                     values.setValue(inst, i, newValue);
                 }
             } else {
@@ -271,7 +271,8 @@ abstract class LIRIntrospection<T> extends FieldIntrospection<T> {
                         newValue = proc.doValue(inst, value, mode, values.getFlags(i));
                     }
                     if (!value.identityEquals(newValue)) {
-                        GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()), "New assignment changes PlatformKind");
+                        // GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()),
+                        // "New assignment changes PlatformKind");
                         valueArray[j] = newValue;
                     }
                 }

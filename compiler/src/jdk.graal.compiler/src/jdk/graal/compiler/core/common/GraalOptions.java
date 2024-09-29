@@ -289,7 +289,7 @@ public final class GraalOptions {
     public static final OptionKey<Boolean> UseSnippetGraphCache = new OptionKey<>(true);
 
     @Option(help = "Enable experimental Trace Register Allocation.", type = OptionType.Debug)
-    public static final OptionKey<Boolean> TraceRA = new OptionKey<>(false);
+    public static final OptionKey<Boolean> TraceRA = new OptionKey<>(true);
     
     @Option(help = "file:doc-files/TraceInliningHelp.txt", type = OptionType.Debug, stability = OptionStability.STABLE)
     public static final OptionKey<Boolean> TraceInlining = new OptionKey<>(false);
