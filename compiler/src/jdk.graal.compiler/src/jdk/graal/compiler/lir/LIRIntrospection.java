@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 
+import jdk.graal.compiler.debug.GraalError;
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.collections.Equivalence;
 import org.graalvm.collections.MapCursor;
@@ -255,8 +256,7 @@ abstract class LIRIntrospection<T> extends FieldIntrospection<T> {
                     if (!(value instanceof CompositeValue)) {
                         assert verifyAssignment(inst, newValue, values.getFlags(i));
                     }
-                    // GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()),
-                    // "New assignment changes PlatformKind");
+                    GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()), "New assignment changes PlatformKind");
                     values.setValue(inst, i, newValue);
                 }
             } else {
@@ -271,8 +271,7 @@ abstract class LIRIntrospection<T> extends FieldIntrospection<T> {
                         newValue = proc.doValue(inst, value, mode, values.getFlags(i));
                     }
                     if (!value.identityEquals(newValue)) {
-                        // GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()),
-                        // "New assignment changes PlatformKind");
+                        GraalError.guarantee(newValue.getPlatformKind().equals(value.getPlatformKind()), "New assignment changes PlatformKind");
                         valueArray[j] = newValue;
                     }
                 }
