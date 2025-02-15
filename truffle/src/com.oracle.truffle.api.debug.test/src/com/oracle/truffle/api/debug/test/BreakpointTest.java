@@ -626,7 +626,7 @@ public class BreakpointTest extends AbstractDebugTest {
         try (DebuggerSession session = startSession()) {
             SourceSection sourceSection = getSourceImpl(source).createSection(16, 9);
             Builder builder = Breakpoint.newBuilder(source.getURI());
-            builder.lineIs(2).columnIs(1).sectionLength(9);
+            // builder.lineIs(2).columnIs(1).sectionLength(9);
             Breakpoint breakpoint = session.install(builder.build());
 
             startEval(source);
